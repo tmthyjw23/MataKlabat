@@ -1,12 +1,15 @@
-# Koordinat PERKIRAAN & kontak belum diverifikasi — JANGAN isi nomor tanpa konfirmasi.
+# Koordinat dari OpenStreetMap (Nominatim, diakses 27 Okt 2026); id OSM di komentar.
+# Yang tidak ada di OSM ditandai PERKIRAAN. JANGAN isi nomor kontak tanpa konfirmasi resmi.
 villages:
-  - {name: "Airmadidi", lat: 1.4196, lon: 124.9822}
-  - {name: "Tatelu",    lat: 1.4930, lon: 124.9770}
-  - {name: "Matungkas", lat: 1.4800, lon: 124.9400}
-  - {name: "Laikit",    lat: 1.4700, lon: 124.9600}
-  - {name: "Klabat",    lat: 1.4300, lon: 124.9950}
+  - {name: "Airmadidi", lat: 1.42749, lon: 124.98029}   # node/976686562 (town)
+  - {name: "Tatelu",    lat: 1.52690, lon: 124.99247}   # node/1308665929 (Tatelu Satu)
+  - {name: "Matungkas", lat: 1.47609, lon: 124.97077}   # node/1308645791
+  - {name: "Laikit",    lat: 1.48809, lon: 124.97474}   # node/1308685232
+  - {name: "Klabat",    lat: 1.50303, lon: 125.05287}   # desa Klabat, Kec. Dimembe (OSM place/village)
 resources:
-  - {name: "Posko BPBD Minahasa Utara", kind: posko,  lat: 1.4190, lon: 124.9830, contact: "ISI_SENDIRI"}
-  - {name: "Damkar Minahasa Utara",     kind: damkar, lat: 1.4180, lon: 124.9800, contact: "ISI_SENDIRI"}
+  - {name: "Damkar Minahasa Utara", kind: damkar, lat: 1.46700, lon: 124.97816, contact: "ISI_SENDIRI"}   # way/535946818, Matungkas
+  - {name: "Puskesmas Airmadidi",   kind: puskesmas, lat: 1.42634, lon: 124.97815, contact: "ISI_SENDIRI"}   # OSM amenity/clinic
+  - {name: "Kantor Bupati Minahasa Utara", kind: pemda, lat: 1.45892, lon: 124.97471, contact: "ISI_SENDIRI"}   # way/526100332
+  - {name: "Posko BPBD Minahasa Utara", kind: posko, lat: 1.4190, lon: 124.9830, contact: "ISI_SENDIRI"}   # PERKIRAAN: tidak ada di OSM
 reference_points:
-  - {name: "Puncak Klabat", lat: 1.4667, lon: 125.0333}
+  - {name: "Puncak Klabat", lat: 1.45304, lon: 125.03121}   # node/1070159421 (natural/peak)

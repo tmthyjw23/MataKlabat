@@ -54,7 +54,7 @@ class MapView {
     this.spreadLayer = L.layerGroup().addTo(this.map);
     this.hotspotLayer = L.layerGroup().addTo(this.map);
     this.windControl = null;
-    this.map.setView([1.4667, 125.0333], 12);
+    this.map.setView([1.45304, 125.03121], 12);
     // The card (and so the map) grows when the incident panel renders next to it.
     new ResizeObserver(() => this.map.invalidateSize()).observe(element);
   }
