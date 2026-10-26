@@ -1,0 +1,27 @@
+# Koordinat PERKIRAAN — verifikasi di Google Maps sebelum demo.
+# facing_deg: arah hadap kamera (0 = utara, 90 = timur).
+cameras:
+  - id: CAM-01
+    name: "Monumen Kaki Dian (Airmadidi)"
+    source: 0                          # webcam laptop
+    lat: 1.4205
+    lon: 124.9850
+    facing_deg: 60
+  - id: CAM-02
+    name: "Jalur Pendakian Klabat - Pos 1"
+    source: "data/videos/cam02.mp4"
+    lat: 1.4420
+    lon: 125.0050
+    facing_deg: 45
+  - id: CAM-03
+    name: "Desa Tatelu"
+    source: "data/videos/cam03.mp4"
+    lat: 1.4930
+    lon: 124.9770
+    facing_deg: 120
+  - id: CAM-04
+    name: "Matungkas - Laikit"
+    source: "data/videos/cam04.mp4"
+    lat: 1.4750
+    lon: 124.9500
+    facing_deg: 90

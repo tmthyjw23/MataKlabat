@@ -1,0 +1,12 @@
+# Koordinat PERKIRAAN & kontak belum diverifikasi — JANGAN isi nomor tanpa konfirmasi.
+villages:
+  - {name: "Airmadidi", lat: 1.4196, lon: 124.9822}
+  - {name: "Tatelu",    lat: 1.4930, lon: 124.9770}
+  - {name: "Matungkas", lat: 1.4800, lon: 124.9400}
+  - {name: "Laikit",    lat: 1.4700, lon: 124.9600}
+  - {name: "Klabat",    lat: 1.4300, lon: 124.9950}
+resources:
+  - {name: "Posko BPBD Minahasa Utara", kind: posko,  lat: 1.4190, lon: 124.9830, contact: "ISI_SENDIRI"}
+  - {name: "Damkar Minahasa Utara",     kind: damkar, lat: 1.4180, lon: 124.9800, contact: "ISI_SENDIRI"}
+reference_points:
+  - {name: "Puncak Klabat", lat: 1.4667, lon: 125.0333}
