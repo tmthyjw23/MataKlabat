@@ -9,9 +9,9 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 ### T1: Scaffold proyek & config
 **Description:** Buat struktur folder sesuai README, `pyproject`/`requirements.txt`, package `src/mataklabat`, `config.py` yang memuat `.env` + `config/cameras.yaml` + `config/resources.yaml` ke dataclass `Settings` (termasuk semua konstanta §4.3 dan §6.2, override-able via env).
 **Acceptance criteria:**
-- [ ] `python -m mataklabat --help` menampilkan perintah `run` dan `check`
-- [ ] `Settings` gagal dengan pesan jelas jika `cameras.yaml` tidak valid
-- [ ] `GEMINI_API_KEY` kosong tidak membuat crash, cukup peringatan dan `llm_enabled=False`
+- [x] `python -m mataklabat --help` menampilkan perintah `run` dan `check`
+- [x] `Settings` gagal dengan pesan jelas jika `cameras.yaml` tidak valid
+- [x] `GEMINI_API_KEY` kosong tidak membuat crash, cukup peringatan dan `llm_enabled=False`
 
 **Verification:** `pytest tests/test_config.py -q`
 **Dependencies:** None · **Files:** `src/mataklabat/{__init__,__main__,config}.py`, `tests/test_config.py` · **Scope:** S

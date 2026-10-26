@@ -409,4 +409,7 @@ reference_points:
 | 2026-10-26 | Deteksi 2 tahap (lokal → LLM) | Menghemat kuota Gemini gratis. LLM memberi konteks dan penjelasan |
 | 2026-10-26 | Monitor dan dashboard dipisah, komunikasi lewat SQLite | Robust, sederhana, tidak perlu message broker |
 | 2026-10-26 | `explanation` deterministik dari template | XAI harus jujur terhadap aturan yang benar-benar terpicu |
+| 2026-10-26 | `pyproject.toml` (src layout) + `pip install -e .` | Supaya `python -m mataklabat` jalan dari mana saja tanpa mengatur `PYTHONPATH`. Dependensi tetap dibaca dari `requirements.txt` |
+| 2026-10-26 | Nama env konstanta = nama field `Settings` huruf besar; trigger §4.3 memakai `FIRE_TRIGGER`, `SMOKE_TRIGGER`, `TRIGGER_WINDOW`, `TRIGGER_MIN_HITS`, dan `CONF_SINGLE_CONFIRM` (0.90) untuk konfirmasi 1 verdict | Dokumen belum memberi nama untuk konstanta ini. Satu aturan penamaan untuk semua override |
+| 2026-10-26 | Nilai env berawalan `isi_` dianggap kosong | `.env` yang disalin mentah dari `.env.example` tidak boleh dianggap API key sungguhan |
 | | *(agent menambahkan baris di sini)* | |
