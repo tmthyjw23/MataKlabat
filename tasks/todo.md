@@ -11,13 +11,13 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 **Acceptance criteria:**
 - [x] `python -m mataklabat --help` menampilkan perintah `run` dan `check`
 - [x] `Settings` gagal dengan pesan jelas jika `cameras.yaml` tidak valid
-- [x] `GEMINI_API_KEY` kosong tidak membuat crash, cukup peringatan dan `llm_enabled=False`
+- [x] `LLM_MODEL` kosong tidak membuat crash, cukup peringatan dan `llm_enabled=False` *(awalnya `GEMINI_API_KEY`, diganti 9router)*
 
 **Verification:** `pytest tests/test_config.py -q`
 **Dependencies:** None · **Files:** `src/mataklabat/{__init__,__main__,config}.py`, `tests/test_config.py` · **Scope:** S
 
 ### T2: CameraSource + perintah `check`
-**Description:** `CameraSource` mendukung int (webcam), path video (loop otomatis saat EOF), dan URL RTSP. Thread pembaca menyimpan frame terbaru. `latest()` mengembalikan `Frame | None`, dan `online` false jika > 5 dtk tanpa frame. `check` menguji setiap kamera, API key (panggilan teks kecil ke Gemini), dan Open-Meteo.
+**Description:** `CameraSource` mendukung int (webcam), path video (loop otomatis saat EOF), dan URL RTSP. Thread pembaca menyimpan frame terbaru. `latest()` mengembalikan `Frame | None`, dan `online` false jika > 5 dtk tanpa frame. `check` menguji setiap kamera, LLM (panggilan teks kecil ke 9router), dan Open-Meteo.
 **Acceptance criteria:**
 - [x] Webcam dan 1 video bisa dibaca bersamaan
 - [x] Video berulang tanpa error saat habis
@@ -57,12 +57,12 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 
 ## Fase 2: LLM + Keputusan Lengkap
 
-### T5: Gemini Vision verifier (§5)
-**Description:** `vision_llm.verify(frame, ctx, prompt_version) -> LLMVerdict` memakai SDK `google-genai`, JSON schema §5.1, resize ke JPEG ≤ 1024 px, retry parse 1x, timeout 20 dtk, dan rate limiter global. Prompt v1/v2 di `prompts.py`. **Cek dokumentasi resmi SDK terlebih dahulu.**
+### T5: LLM Vision verifier via 9router (§5)
+**Description:** `vision_llm.verify(frame, ctx, prompt_version) -> LLMVerdict` memakai SDK `openai` ke endpoint 9router (`LLM_BASE_URL`), JSON schema §5.1, resize ke JPEG ≤ 1024 px, retry parse 1x, timeout 20 dtk, dan rate limiter global. Prompt v1/v2 di `prompts.py`. **Cek dokumentasi resmi SDK terlebih dahulu.**
 **Acceptance criteria:**
 - [ ] Foto api memberi `fire_visible=true`. Foto hutan normal memberi `hazard_type="none"`
-- [ ] Output selalu tervalidasi ke dataclass, dan error menghasilkan `LLMVerdict(error=...)`, bukan exception
-- [ ] Dua panggilan beruntun menghormati `LLM_MIN_INTERVAL_S`
+- [x] Output selalu tervalidasi ke dataclass, dan error menghasilkan `LLMVerdict(error=...)`, bukan exception
+- [x] Dua panggilan beruntun menghormati `LLM_MIN_INTERVAL_S`
 
 **Verification:** `pytest tests/test_vision_llm.py -q` (mock client) + 1 panggilan nyata `python -m mataklabat check --llm-sample data/test_set/fire/<file>.jpg`
 **Dependencies:** T1 · **Files:** `vision_llm.py`, `prompts.py`, `tests/test_vision_llm.py` · **Scope:** M
@@ -103,7 +103,7 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 **Dependencies:** T6 · **Files:** `risk.py`, `tests/test_risk.py` · **Scope:** S
 
 ### T9: IncidentAgent + tools + notifier (§7)
-**Description:** Tools §7.2 (`estimate_spread` dengan konversi arah angin yang benar), loop function calling Gemini maks 6 langkah dan timeout 60 dtk, laporan markdown disimpan ke `incidents.report_md`, jejak tool ke `agent_steps_json`. `ConsoleNotifier` dan `TelegramNotifier` (mengikuti `AUTO_SEND_ALERT`). Cooldown 10 menit.
+**Description:** Tools §7.2 (`estimate_spread` dengan konversi arah angin yang benar), loop tool calling (OpenAI-compatible via 9router) maks 6 langkah dan timeout 60 dtk, laporan markdown disimpan ke `incidents.report_md`, jejak tool ke `agent_steps_json`. `ConsoleNotifier` dan `TelegramNotifier` (mengikuti `AUTO_SEND_ALERT`). Cooldown 10 menit.
 **Acceptance criteria:**
 - [ ] Angin **dari** 270° (barat) memberi sebaran **ke** timur (90°). Ada unit test
 - [ ] Laporan memiliki 6 bagian §7.3 dan label "Dihasilkan AI. Verifikasi lapangan diperlukan."

@@ -4,15 +4,19 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import json
 import logging
 import sys
 import time
+from pathlib import Path
 
 import requests
 
 from mataklabat.camera import CameraSource
-from mataklabat.config import PROMPT_VERSIONS, TIMEZONE, ConfigError, Settings, load_settings
+from mataklabat.config import PROMPT_VERSIONS, TIMEZONE, ConfigError, Settings, load_settings, now_local
 from mataklabat.pipeline import Monitor
+from mataklabat.prompts import PromptContext
+from mataklabat.vision_llm import VisionVerifier
 
 log = logging.getLogger("mataklabat")
 
@@ -27,13 +31,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     run = sub.add_parser("run", help="Jalankan pemantauan kamera (monitor).")
     run.add_argument("--camera", metavar="ID", help="Hanya jalankan satu kamera, misalnya CAM-01.")
-    run.add_argument("--no-llm", action="store_true", help="Hanya detektor lokal, tanpa Gemini.")
-    run.add_argument("--prompt", choices=PROMPT_VERSIONS, help="Versi prompt verifikasi Gemini.")
+    run.add_argument("--no-llm", action="store_true", help="Hanya detektor lokal, tanpa LLM.")
+    run.add_argument("--prompt", choices=PROMPT_VERSIONS, help="Versi prompt verifikasi LLM.")
     run.add_argument(
         "--duration", type=float, metavar="DETIK", help="Berhenti otomatis setelah sekian detik."
     )
 
-    sub.add_parser("check", help="Cek konfigurasi, kamera, API key Gemini, dan koneksi cuaca.")
+    check = sub.add_parser("check", help="Cek konfigurasi, kamera, LLM (9router), dan koneksi cuaca.")
+    check.add_argument(
+        "--llm-sample", type=Path, metavar="GAMBAR",
+        help="Kirim satu gambar ke LLM vision dan tampilkan verdict JSON-nya.",
+    )
+    check.add_argument("--prompt", choices=PROMPT_VERSIONS, help="Versi prompt untuk --llm-sample.")
     return parser
 
 
@@ -47,12 +56,12 @@ def cmd_run(settings: Settings, args: argparse.Namespace) -> int:
         overrides["cameras"] = (settings.camera(args.camera),)
     settings = dataclasses.replace(settings, **overrides)
 
-    mode = f"Gemini {settings.gemini_model}, prompt {settings.prompt_version}" if settings.llm_enabled else "tanpa LLM"
+    mode = f"LLM {settings.llm_model}, prompt {settings.prompt_version}" if settings.llm_enabled else "tanpa LLM"
     print(f"MataKlabat: {len(settings.cameras)} kamera, {mode}.")
     for cam in settings.cameras:
         print(f"  {cam.id}  {cam.name}  (sumber: {cam.source})")
     if settings.llm_enabled:
-        print("Catatan: verifikasi Gemini belum tersambung (T5), keputusan memakai detektor lokal.")
+        print("Catatan: verifikasi LLM baru dipakai Decision Engine di T6, sementara memakai detektor lokal.")
     Monitor(settings).run_forever(duration_s=args.duration)
     return 0
 
@@ -86,23 +95,34 @@ def check_cameras(settings: Settings, wait_s: float = 6.0) -> list[CheckRow]:
             src.stop()
 
 
-def check_gemini(settings: Settings) -> CheckRow:
+def check_llm(settings: Settings, client=None) -> CheckRow:
     if not settings.llm_enabled:
-        return ("Gemini", False, "GEMINI_API_KEY kosong, sistem hanya memakai detektor lokal")
-    from google import genai
-    from google.genai import types
-
+        return ("LLM", False, "LLM_MODEL kosong, sistem hanya memakai detektor lokal")
     try:
-        client = genai.Client(
-            api_key=settings.gemini_api_key, http_options=types.HttpOptions(timeout=20_000)
+        client = client or VisionVerifier(settings).client
+        reply = client.chat.completions.create(
+            model=settings.llm_model,
+            messages=[{"role": "user", "content": "Jawab hanya dengan satu kata: OK"}],
         )
-        reply = client.models.generate_content(
-            model=settings.gemini_model, contents="Jawab hanya dengan satu kata: OK"
-        )
-        text = (reply.text or "").strip()
-        return ("Gemini", True, f"model {settings.gemini_model} menjawab {text[:20]!r}")
+        text = (reply.choices[0].message.content or "").strip()
+        return ("LLM", True, f"{settings.llm_model} @ {settings.llm_base_url} menjawab {text[:20]!r}")
     except Exception as exc:  # noqa: BLE001 - any SDK/network error is reported, not raised
-        return ("Gemini", False, f"model {settings.gemini_model}: {_short_error(exc)}")
+        return ("LLM", False, f"{settings.llm_model} @ {settings.llm_base_url}: {_short_error(exc)}")
+
+
+def cmd_llm_sample(settings: Settings, image_path: Path, prompt_version: str | None) -> int:
+    """Send one image through the real vision verifier and print the verdict."""
+    import cv2
+
+    image = cv2.imread(str(image_path))
+    if image is None:
+        print(f"❌ Gambar tidak bisa dibaca: {image_path}", file=sys.stderr)
+        return 1
+    cam = settings.cameras[0]
+    ctx = PromptContext(camera_name=cam.name, facing_deg=cam.facing_deg, local_time=now_local())
+    verdict = VisionVerifier(settings).verify(image, ctx, prompt_version)
+    print(json.dumps(verdict.to_dict(), ensure_ascii=False, indent=2))
+    return 0 if verdict.ok else 1
 
 
 def check_open_meteo(lat: float, lon: float) -> CheckRow:
@@ -152,7 +172,7 @@ def cmd_check(settings: Settings) -> int:
     print("Menguji kamera...")
     rows = check_cameras(settings)
     first = settings.cameras[0]
-    rows += [check_gemini(settings), check_open_meteo(first.lat, first.lon), check_telegram(settings)]
+    rows += [check_llm(settings), check_open_meteo(first.lat, first.lon), check_telegram(settings)]
 
     symbols = {True: "✅", False: "❌", None: "➖"}
     for name, ok, detail in rows:
@@ -175,6 +195,8 @@ def main(argv: list[str] | None = None) -> int:
         settings = load_settings()
         if args.command == "run":
             return cmd_run(settings, args)
+        if args.llm_sample:
+            return cmd_llm_sample(settings, args.llm_sample, args.prompt)
         return cmd_check(settings)
     except ConfigError as exc:
         print(f"Konfigurasi tidak valid: {exc}", file=sys.stderr)

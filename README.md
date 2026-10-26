@@ -30,11 +30,11 @@ Analisis akar masalah lengkap ada di [`docs/RCA.md`](docs/RCA.md), termasuk Fish
 | # | Fitur | Keterangan |
 |---|---|---|
 | 1 | **Multi-camera monitoring** | Webcam, file video, atau RTSP/IP camera, dikonfigurasi di `config/cameras.yaml` |
-| 2 | **Deteksi 2 tahap** | Tahap 1: detektor lokal cepat (warna + gerak, opsional YOLO). Tahap 2: **Gemini Vision** memverifikasi dan menjelaskan |
+| 2 | **Deteksi 2 tahap** | Tahap 1: detektor lokal cepat (warna + gerak, opsional YOLO). Tahap 2: **LLM Vision** (lewat 9router) memverifikasi dan menjelaskan |
 | 3 | **Decision Engine** | Fusi skor lokal, verdict LLM, persistensi waktu, dan indeks risiko cuaca menjadi AMAN / WASPADA / BAHAYA |
 | 4 | **Fire Risk Index** | Indeks 0–100 dari suhu, kelembapan, angin, dan hari tanpa hujan (Open-Meteo, gratis tanpa API key) |
 | 5 | **Explainable AI** | Setiap keputusan menyimpan *decision trace*: input, aturan yang terpicu, dan alasan LLM |
-| 6 | **AI Agent tindak lanjut** | Agent Gemini dengan *function calling*: cek cuaca, hotspot satelit, estimasi arah sebaran, sumber daya terdekat, susun dan kirim peringatan |
+| 6 | **AI Agent tindak lanjut** | Agent LLM dengan *tool calling*: cek cuaca, hotspot satelit, estimasi arah sebaran, sumber daya terdekat, susun dan kirim peringatan |
 | 7 | **Dashboard** | Streamlit: grid kamera, **peta Klabat** dengan status tiap kamera, log insiden, grafik risiko, panel penjelasan |
 | 8 | **Notifikasi** | Console, dan opsional **Telegram Bot** |
 | 9 | **Evaluasi** | Script evaluasi pada test set (api, asap, kabut, senja, lampu, normal): precision, recall, false alarm, analisis kegagalan |
@@ -53,7 +53,7 @@ flowchart LR
     end
 
     C1 & C2 & C3 & C4 --> S1[Tahap 1<br/>Detektor Lokal<br/>warna + gerak / YOLO]
-    S1 -- skor tinggi / persisten<br/>atau heartbeat --> S2[Tahap 2<br/>Gemini Vision<br/>verifikasi + alasan]
+    S1 -- skor tinggi / persisten<br/>atau heartbeat --> S2[Tahap 2<br/>LLM Vision via 9router<br/>verifikasi + alasan]
     W[(Open-Meteo<br/>cuaca)] --> R[Fire Risk Index]
     S1 --> D{Decision Engine}
     S2 --> D
@@ -79,7 +79,7 @@ Detail komponen, aturan keputusan, skema JSON LLM, dan skema database ada di [`d
 ### Prasyarat
 - Python **3.11+**
 - Webcam (bawaan laptop sudah cukup)
-- **Gemini API key**, gratis dari [Google AI Studio](https://aistudio.google.com/apikey)
+- **[9router](https://github.com/decolua/9router)** berjalan (default `http://localhost:20128`), dengan model yang mendukung **gambar** dan **tool calling**
 - (Opsional) Telegram Bot token dan NASA FIRMS MAP_KEY
 
 ### Instalasi
@@ -90,7 +90,7 @@ cd MataKlabat
 python -m venv .venv
 # Windows: .venv\Scripts\activate    |   macOS/Linux: source .venv/bin/activate
 pip install -e .            # memasang paket mataklabat + semua dependensi
-cp .env.example .env        # Windows: copy .env.example .env  — lalu isi GEMINI_API_KEY
+cp .env.example .env        # Windows: copy .env.example .env  — lalu isi LLM_API_KEY dan LLM_MODEL
 ```
 
 ### Menjalankan
@@ -125,8 +125,9 @@ pytest                                # unit test
 
 | Variabel | Wajib | Default | Keterangan |
 |---|---|---|---|
-| `GEMINI_API_KEY` | ✅ | – | API key Google AI Studio |
-| `GEMINI_MODEL` | | `gemini-2.5-flash` | Model untuk vision dan agent (ganti jika ada versi lebih baru) |
+| `LLM_MODEL` | ✅ | – | Nama model di 9router (wajib mendukung gambar dan tool calling) |
+| `LLM_API_KEY` | | – | API key dari dashboard 9router |
+| `LLM_BASE_URL` | | `http://localhost:20128/v1` | Endpoint OpenAI-compatible 9router |
 | `LLM_MIN_INTERVAL_S` | | `8` | Jeda minimum antar panggilan LLM (menjaga kuota gratis) |
 | `HEARTBEAT_S` | | `120` | Cek LLM berkala walau detektor lokal tenang (`0` = mati) |
 | `TELEGRAM_BOT_TOKEN` | | – | Opsional, untuk notifikasi Telegram |
@@ -185,7 +186,7 @@ mataklabat/
 │   ├── config.py             # load .env + yaml
 │   ├── camera.py             # CameraSource (webcam/video/rtsp)
 │   ├── detector.py           # Tahap 1: ColorMotionDetector (+ YoloDetector opsional)
-│   ├── vision_llm.py         # Tahap 2: Gemini Vision → JSON terstruktur
+│   ├── vision_llm.py         # Tahap 2: LLM Vision (9router) → JSON terstruktur
 │   ├── prompts.py            # prompt v1 & v2 (untuk eksperimen)
 │   ├── risk.py               # Open-Meteo + Fire Risk Index
 │   ├── decision.py           # Decision Engine + state machine
@@ -217,7 +218,7 @@ mataklabat/
 MataKlabat **tidak** langsung memercayai satu model. Keputusan diambil dari beberapa bukti:
 
 1. **Detektor lokal** (murah, cepat, sensitif) menangkap piksel berwarna api atau asap yang **bergerak**. Banyak false alarm, tapi jarang melewatkan kejadian.
-2. **Gemini Vision** (mahal, lambat, kontekstual) memastikan apakah itu benar api/asap atau **lookalike** (kabut, awan, senja, lampu, debu, uap). Gemini mengembalikan `confidence` dan alasan.
+2. **LLM Vision** (mahal, lambat, kontekstual) memastikan apakah itu benar api/asap atau **lookalike** (kabut, awan, senja, lampu, debu, uap). LLM mengembalikan `confidence` dan alasan.
 3. **Persistensi**: bukti harus muncul berulang, bukan hanya di satu frame.
 4. **Konteks cuaca**: saat Fire Risk Index tinggi (kering dan berangin), ambang BAHAYA sedikit diturunkan.
 
@@ -238,7 +239,7 @@ Keterbatasan dan analisis kegagalan (kabut dikira asap, senja dikira api, asap t
 
 - Ini **prototipe akademik**, bukan pengganti sistem resmi BPBD, Manggala Agni, atau BMKG.
 - Kamera di dunia nyata membutuhkan daya, jaringan (4G/LoRa), pelindung cuaca, dan posisi tinggi. Semua itu di luar lingkup demo.
-- Gemini butuh internet, dan kuota gratisnya terbatas. Karena itu detektor lokal tetap berjalan offline.
+- LLM butuh 9router yang berjalan dan internet, serta kuota provider-nya terbatas. Karena itu detektor lokal tetap berjalan offline.
 - Fire Risk Index adalah **heuristik sederhana**, bukan Fire Weather Index resmi.
 - Deteksi malam hari dan asap sangat tipis/jauh masih lemah.
 
@@ -271,7 +272,7 @@ Tugas mata kuliah **Artificial Intelligence**, Fakultas Ilmu Komputer, Universit
 - Metro TV News: [BNPB: 60 Hektare Lahan di Kaki Gunung Klabat Terbakar](https://www.metrotvnews.com/read/KvJCJZAA-bnpb-60-hektare-lahan-di-kaki-gunung-klabat-terbakar)
 - Teras Manado: [Karhutla Minut Bergerak ke Hutan Lindung Gunung Klabat](https://terasmanado.com/2026/10/01/karhutla-minut-bergerak-ke-hutan-lindung-gunung-klabat-joune-ganda-perkuat-koordinasi-penanganan/)
 - Totabuan News: [Karhutla Rambah Hutan Lindung Gunung Klabat](https://totabuan.news/daerah/minut/karhutla-rambah-hutan-lindung-gunung-klabat-bupati-joune-ganda-waspadai-meluasnya-ancaman-ekologi-dan-ekonomi/)
-- [Open-Meteo API](https://open-meteo.com/) · [Google Gemini API](https://ai.google.dev/) · [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/)
+- [Open-Meteo API](https://open-meteo.com/) · [9router](https://github.com/decolua/9router) · [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/)
 
 ## 📄 Lisensi
 

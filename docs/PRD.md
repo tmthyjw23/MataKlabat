@@ -40,7 +40,7 @@ Karhutla di kaki Gunung Klabat yang dimulai **19 September 2026** meluas dari 60
 |---|---|---|
 | F1 | Membaca ≥ 1 webcam dan ≥ 2 video file sebagai kamera virtual secara bersamaan | Must |
 | F2 | Detektor lokal menghasilkan `fire_score`, `smoke_score`, dan bbox per frame | Must |
-| F3 | Verifikasi Gemini Vision dengan output JSON terstruktur (ARCHITECTURE §5) | Must |
+| F3 | Verifikasi LLM Vision (via 9router) dengan output JSON terstruktur (ARCHITECTURE §5) | Must |
 | F4 | Decision Engine dengan aturan R0–R6 dan state machine (ARCHITECTURE §6) | Must |
 | F5 | Decision trace tersimpan untuk setiap event | Must |
 | F6 | Dashboard: grid kamera, peta, panel "Mengapa?", log insiden | Must |
@@ -74,7 +74,7 @@ Karhutla di kaki Gunung Klabat yang dimulai **19 September 2026** meluas dari 60
 
 | Asumsi / Risiko | Dampak | Mitigasi |
 |---|---|---|
-| Kuota gratis Gemini cukup untuk demo | Tinggi | Rate limit, trigger lokal, mode `--no-llm` |
+| 9router berjalan dan kuota model di belakangnya cukup untuk demo | Tinggi | Rate limit, trigger lokal, mode `--no-llm` |
 | Detektor warna terlalu sensitif terhadap kabut | Sedang | Memang diserahkan ke Tahap 2. Dibahas sebagai F1 |
 | Internet kampus tidak stabil saat demo | Tinggi | Rekam video cadangan demo. Degradasi ke WASPADA `unverified` |
 | Koordinat desa/posko tidak akurat | Rendah | Diberi label "perkiraan", verifikasi sebelum demo |

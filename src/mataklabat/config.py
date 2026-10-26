@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 log = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+DEFAULT_LLM_BASE_URL = "http://localhost:20128/v1"  # 9router, OpenAI-compatible
 TIMEZONE = "Asia/Makassar"
 PROMPT_VERSIONS = ("v1", "v2")
 
@@ -76,9 +76,10 @@ class Settings:
     cameras: tuple[CameraConfig, ...]
     resources: Resources
 
-    # LLM
-    gemini_api_key: str | None = field(default=None, repr=False)
-    gemini_model: str = DEFAULT_GEMINI_MODEL
+    # LLM (any OpenAI-compatible endpoint; 9router by default)
+    llm_base_url: str = DEFAULT_LLM_BASE_URL
+    llm_api_key: str | None = field(default=None, repr=False)
+    llm_model: str | None = None
     llm_enabled: bool = False
     prompt_version: str = "v2"
 
@@ -151,10 +152,10 @@ def load_settings(
     cameras = _load_cameras(root / "config" / "cameras.yaml", root)
     resources = _load_resources(root / "config" / "resources.yaml")
 
-    api_key = _env_str("GEMINI_API_KEY")
-    if api_key is None:
+    llm_model = _env_str("LLM_MODEL")
+    if llm_model is None:
         log.warning(
-            "GEMINI_API_KEY kosong: verifikasi Gemini dan AI Agent dimatikan, "
+            "LLM_MODEL kosong: verifikasi LLM dan AI Agent dimatikan, "
             "sistem hanya memakai detektor lokal."
         )
 
@@ -169,9 +170,10 @@ def load_settings(
         root=root,
         cameras=cameras,
         resources=resources,
-        gemini_api_key=api_key,
-        gemini_model=_env_str("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL,
-        llm_enabled=api_key is not None,
+        llm_base_url=(_env_str("LLM_BASE_URL") or DEFAULT_LLM_BASE_URL).rstrip("/"),
+        llm_api_key=_env_str("LLM_API_KEY"),
+        llm_model=llm_model,
+        llm_enabled=llm_model is not None,
         prompt_version=prompt_version,
         telegram_bot_token=_env_str("TELEGRAM_BOT_TOKEN"),
         telegram_chat_id=_env_str("TELEGRAM_CHAT_ID"),

@@ -1,6 +1,7 @@
 opencv-python>=4.9
 numpy>=1.26
-google-genai>=1.0
+# openai: klien untuk endpoint OpenAI-compatible (9router)
+openai>=1.40
 streamlit>=1.37
 streamlit-folium>=0.20
 folium>=0.17

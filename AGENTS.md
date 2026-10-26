@@ -21,9 +21,9 @@ Kamu membangun **MataKlabat**, sistem peringatan dini karhutla Gunung Klabat (Py
 
 ## Stack
 
-- Python 3.11+, `opencv-python`, `numpy`, `google-genai` (SDK Gemini **baru**, bukan `google-generativeai`), `streamlit`, `streamlit-folium`, `folium`, `plotly`, `pandas`, `pyyaml`, `python-dotenv`, `requests`, `pytest`
+- Python 3.11+, `opencv-python`, `numpy`, `openai` (klien untuk endpoint OpenAI-compatible **9router**, bukan API OpenAI langsung), `streamlit`, `streamlit-folium`, `folium`, `plotly`, `pandas`, `pyyaml`, `python-dotenv`, `requests`, `pytest`
 - Opsional: `ultralytics` (hanya jika `YOLO_WEIGHTS` diisi; import secara lazy)
-- Model default: env `GEMINI_MODEL` (default `gemini-2.5-flash`). Jangan hardcode nama model di luar `config.py`.
+- LLM: env `LLM_BASE_URL` (default `http://localhost:20128/v1`), `LLM_API_KEY`, `LLM_MODEL` (wajib, model vision + tool calling dari dashboard 9router). Jangan hardcode nama model di kode.
 
 ## Perintah
 
@@ -49,5 +49,5 @@ pytest -q
 - Menambah sentiment analysis (dikesampingkan dosen)
 - Menulis `explanation` di decision trace memakai LLM. Wajib template deterministik
 - Membiarkan agent mengirim Telegram otomatis saat `AUTO_SEND_ALERT=false`
-- Memanggil Gemini di setiap frame. Patuhi trigger T1–T3 dan `LLM_MIN_INTERVAL_S`
+- Memanggil LLM di setiap frame. Patuhi trigger T1–T3 dan `LLM_MIN_INTERVAL_S`
 - Menghapus test yang gagal atau melonggarkan ambang hanya supaya test lulus

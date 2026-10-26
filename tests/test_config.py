@@ -26,7 +26,7 @@ reference_points:
 """
 
 ENV_NAMES = [
-    "GEMINI_API_KEY", "GEMINI_MODEL", "PROMPT_VERSION", "AUTO_SEND_ALERT",
+    "LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL", "PROMPT_VERSION", "AUTO_SEND_ALERT",
     "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "FIRMS_MAP_KEY", "YOLO_WEIGHTS",
 ] + [f.name.upper() for f in fields(Settings)]
 
@@ -68,35 +68,42 @@ def test_relative_video_source_resolved_against_root(tmp_path):
     assert s.cameras[1].source == str(tmp_path / "data/videos/cam02.mp4")
 
 
-def test_missing_api_key_disables_llm(tmp_path, caplog):
+def test_missing_llm_model_disables_llm(tmp_path, caplog):
     with caplog.at_level(logging.WARNING):
         s = load_settings(make_root(tmp_path))
     assert s.llm_enabled is False
-    assert s.gemini_api_key is None
-    assert "GEMINI_API_KEY" in caplog.text
+    assert s.llm_model is None
+    assert s.llm_base_url == "http://localhost:20128/v1"
+    assert "LLM_MODEL" in caplog.text
 
 
-def test_placeholder_api_key_counts_as_missing(tmp_path, monkeypatch):
-    monkeypatch.setenv("GEMINI_API_KEY", "isi_api_key_dari_aistudio")
-    assert load_settings(make_root(tmp_path)).llm_enabled is False
+def test_placeholder_values_count_as_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_MODEL", "isi_nama_model_dari_9router")
+    monkeypatch.setenv("LLM_API_KEY", "isi_api_key_dari_dashboard_9router")
+    s = load_settings(make_root(tmp_path))
+    assert s.llm_enabled is False and s.llm_api_key is None
 
 
-def test_api_key_enables_llm_and_stays_out_of_repr(tmp_path, monkeypatch):
-    monkeypatch.setenv("GEMINI_API_KEY", "secret-123")
+def test_llm_settings_and_key_stays_out_of_repr(tmp_path, monkeypatch):
+    monkeypatch.setenv("LLM_MODEL", "gc/gemini-2.5-flash")
+    monkeypatch.setenv("LLM_API_KEY", "secret-123")
+    monkeypatch.setenv("LLM_BASE_URL", "http://127.0.0.1:9999/v1/")
     s = load_settings(make_root(tmp_path))
     assert s.llm_enabled is True
+    assert s.llm_model == "gc/gemini-2.5-flash"
+    assert s.llm_base_url == "http://127.0.0.1:9999/v1"
     assert "secret-123" not in repr(s)
 
 
 def test_dotenv_file_is_read(tmp_path):
     root = make_root(tmp_path)
-    (root / ".env").write_text("GEMINI_API_KEY=from-dotenv\nCONF_DANGER=0.75\n", encoding="utf-8")
+    (root / ".env").write_text("LLM_MODEL=from-dotenv\nCONF_DANGER=0.75\n", encoding="utf-8")
     try:
         s = load_settings(root)
-        assert s.gemini_api_key == "from-dotenv"
+        assert s.llm_model == "from-dotenv"
         assert s.conf_danger == 0.75
     finally:
-        os.environ.pop("GEMINI_API_KEY", None)
+        os.environ.pop("LLM_MODEL", None)
         os.environ.pop("CONF_DANGER", None)
 
 

@@ -22,11 +22,11 @@ Dokumen ini adalah **kontrak teknis** sistem. AI coding agent harus mengikuti na
 | `camera.py` | `CameraSource`: buka webcam (int), file video (loop), atau URL RTSP. Thread pembaca menyimpan frame terbaru | source → `Frame(camera_id, ts, image)` |
 | `detector.py` | Tahap 1. `ColorMotionDetector` (default), `YoloDetector` (opsional, jika `YOLO_WEIGHTS` diisi) | `Frame` → `LocalDetection` |
 | `prompts.py` | Prompt `v1` (polos) dan `v2` (sadar lookalike + konteks Klabat) | – |
-| `vision_llm.py` | Tahap 2. Kirim frame (JPEG ≤ 1024 px) + konteks ke Gemini, paksa output JSON sesuai skema §5 | `Frame`, ctx → `LLMVerdict` |
+| `vision_llm.py` | Tahap 2. Kirim frame (JPEG ≤ 1024 px) + konteks ke LLM vision via 9router (OpenAI-compatible), paksa output JSON sesuai skema §5 | `Frame`, ctx → `LLMVerdict` |
 | `risk.py` | Ambil cuaca dari Open-Meteo (cache 15 menit), hitung Fire Risk Index | lat, lon → `RiskSnapshot` |
 | `decision.py` | `DecisionEngine` per kamera: fusi bukti + state machine §6 | bukti → `Decision` (+ trace) |
 | `tools.py` | Fungsi-fungsi tool agent §7 | – |
-| `agent.py` | `IncidentAgent`: loop function-calling Gemini, maks 6 langkah | `Incident` → `IncidentReport` |
+| `agent.py` | `IncidentAgent`: loop tool calling (OpenAI-compatible, via 9router), maks 6 langkah | `Incident` → `IncidentReport` |
 | `notifier.py` | `ConsoleNotifier`, `TelegramNotifier` | pesan → terkirim |
 | `storage.py` | SQLite (WAL mode): tabel §9 | – |
 | `pipeline.py` | Orkestrasi: satu `CameraWorker` (thread) per kamera | – |
@@ -44,7 +44,7 @@ sequenceDiagram
     participant Cam as CameraSource
     participant W as CameraWorker
     participant D1 as Detektor Lokal
-    participant L as Gemini Vision
+    participant L as LLM Vision (9router)
     participant R as RiskService
     participant E as DecisionEngine
     participant A as IncidentAgent
@@ -106,11 +106,11 @@ Antrean LLM bersifat global (satu `threading.Lock` + timestamp). Prioritasnya T2
 
 ---
 
-## 5. Tahap 2: Verifikasi Gemini Vision
+## 5. Tahap 2: Verifikasi LLM Vision (via 9router)
 
 ### 5.1 Kontrak output (JSON, wajib)
 
-Gunakan `response_mime_type="application/json"` dan `response_schema` di SDK `google-genai`.
+Gunakan `chat.completions` dengan `response_format={"type": "json_schema", ...}` (SDK `openai` ke `LLM_BASE_URL`). Kontrak yang sama juga ditulis di system message, karena tidak semua provider di belakang 9router mendukung `response_format`; jika endpoint menolaknya (HTTP 400), panggil ulang tanpa `response_format`.
 
 ```json
 {
@@ -264,7 +264,7 @@ Setiap `Decision` menyimpan `trace` (JSON):
 
 ### 7.1 Tujuan
 
-Saat sebuah kamera masuk BAHAYA, `IncidentAgent` menyusun **laporan insiden yang bisa langsung ditindaklanjuti**. Agent memakai Gemini function calling, maksimal 6 langkah tool, dengan timeout total 60 detik.
+Saat sebuah kamera masuk BAHAYA, `IncidentAgent` menyusun **laporan insiden yang bisa langsung ditindaklanjuti**. Agent memakai tool calling (format OpenAI) lewat 9router, maksimal 6 langkah tool, dengan timeout total 60 detik.
 
 ### 7.2 Tools
 
@@ -416,4 +416,6 @@ reference_points:
 | 2026-10-26 | R6 juga dipakai untuk langkah "menahan level": selama level > AMAN dan tidak ada bukti, R6 menghitung langkah bersih (`clear: n/4` di trace) dan baru menurunkan level saat hitungan penuh. Bukti baru mereset hitungan. Rule bukti (R4, nanti R1–R3) tidak pernah menurunkan level | §6.3 tidak menyebut rule untuk langkah tunggu; memakai R6 menghindari rule baru dan tetap jujur di trace |
 | 2026-10-26 | Satu langkah = satu frame yang diproses (`PROCESS_FPS`). Mode tanpa LLM: langkah bersih = T1 tidak aktif | Dengan PROCESS_FPS=2 dan CLEAR_STEPS=4, turun 1 level butuh ±2 dtk setelah T1 padam |
 | 2026-10-26 | `run --duration DETIK` | Untuk uji stabilitas Checkpoint A dan verifikasi otomatis tanpa Ctrl+C |
+| 2026-10-26 | **LLM lewat 9router (endpoint OpenAI-compatible), bukan Gemini/`google-genai`.** Env `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`; SDK `openai`. Dipakai untuk vision (T5) dan agent (T9). Tidak ada cadangan Gemini langsung | Keputusan pemilik proyek. Satu gateway untuk banyak provider/model; model bisa diganti dari dashboard 9router tanpa ubah kode |
+| 2026-10-26 | `llm_enabled` = `LLM_MODEL` terisi (API key opsional, 9router lokal bisa tanpa key). `risk_factors: ["none"]` disimpan sebagai daftar kosong. Confidence 1–100 dianggap persen | Normalisasi jawaban model yang berbeda-beda gaya |
 | | *(agent menambahkan baris di sini)* | |

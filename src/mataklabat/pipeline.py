@@ -105,7 +105,7 @@ class CameraWorker(threading.Thread):
 
     def step(self, frame: Frame) -> Decision:
         local = self.detector.detect(frame)
-        # TODO(T5/T6): call Gemini on triggers T1-T3; until then the LLM is unavailable.
+        # TODO(T6): call the vision LLM on triggers T1-T3; until then the LLM is unavailable.
         decision = self.engine.update(local, llm_available=False)
         self.last_decision = decision
         for sink in self.sinks:

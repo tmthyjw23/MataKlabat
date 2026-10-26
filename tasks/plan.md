@@ -1,7 +1,7 @@
 # Implementation Plan: MataKlabat (build 1 hari)
 
 ## Overview
-Membangun prototipe peringatan dini karhutla Gunung Klabat. Kamera (webcam + video) masuk ke detektor lokal, lalu Gemini Vision memverifikasi, Decision Engine menetapkan AMAN/WASPADA/BAHAYA beserta trace, AI Agent menyusun laporan insiden, dan hasilnya tampil di dashboard Streamlit dengan peta. Ditutup dengan script evaluasi untuk analisis kegagalan. Task detail ada di `tasks/todo.md`.
+Membangun prototipe peringatan dini karhutla Gunung Klabat. Kamera (webcam + video) masuk ke detektor lokal, lalu LLM Vision (via 9router) memverifikasi, Decision Engine menetapkan AMAN/WASPADA/BAHAYA beserta trace, AI Agent menyusun laporan insiden, dan hasilnya tampil di dashboard Streamlit dengan peta. Ditutup dengan script evaluasi untuk analisis kegagalan. Task detail ada di `tasks/todo.md`.
 
 ## Architecture Decisions
 - **Python + Streamlit**: rubrik meminta `.py`, dan Streamlit adalah UI tercepat.
@@ -30,8 +30,8 @@ Membangun prototipe peringatan dini karhutla Gunung Klabat. Kamera (webcam + vid
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| API `google-genai` berbeda dari ingatan agent | High | Cek dokumentasi resmi `ai.google.dev` sebelum T5, dan buat wrapper tipis di `vision_llm.py` |
-| Rate limit / kuota Gemini habis | High | `LLM_MIN_INTERVAL_S`, trigger T1–T3, `--no-llm`, cache verdict per hash frame (opsional) |
+| Provider di belakang 9router tidak mendukung gambar/`response_format`/tool calling | High | Kontrak JSON juga di system message, fallback tanpa `response_format`, uji model dengan `check --llm-sample`; wrapper tipis di `vision_llm.py` |
+| Rate limit / kuota provider di 9router habis | High | `LLM_MIN_INTERVAL_S`, trigger T1–T3, `--no-llm`, cache verdict per hash frame (opsional) |
 | Streamlit + loop kamera saling mengunci | Med | Kamera hanya di proses monitor. Dashboard hanya membaca snapshot dan DB |
 | Webcam dipakai aplikasi lain (Zoom) | Med | `check` melaporkan dengan jelas, dan bisa memakai video sebagai CAM-01 |
 | Detektor warna terlalu banyak false positive | Med | Memang diserahkan ke LLM. Tuning `FIRE_GAIN`/`SMOKE_GAIN` di config |
@@ -39,5 +39,5 @@ Membangun prototipe peringatan dini karhutla Gunung Klabat. Kamera (webcam + vid
 
 ## Open Questions (untuk tim)
 - Siapa anggota tim lain, dan siapa yang memegang laporan PDF dan slide?
-- Apakah dosen mewajibkan Gemini, atau boleh membandingkan dengan LLM lain (bonus)?
+- ~~Apakah dosen mewajibkan Gemini?~~ Diputuskan memakai 9router (lihat Decision Log). Pastikan dosen tidak keberatan.
 - Video untuk CAM-02..04: rekam sendiri di Klabat atau pakai stok video bebas lisensi?

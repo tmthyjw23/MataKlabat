@@ -1,7 +1,7 @@
 """Stage 1: cheap per-frame fire/smoke scoring (ARCHITECTURE §4).
 
 `ColorMotionDetector` is deliberately sensitive: fog and dust also trigger the
-smoke mask. Stage 2 (Gemini) is responsible for rejecting those lookalikes.
+smoke mask. Stage 2 (vision LLM) is responsible for rejecting those lookalikes.
 """
 
 from __future__ import annotations
