@@ -106,7 +106,7 @@ class Housekeeper:
             elapsed += self.interval_s
 
 
-def build_monitor(settings: Settings, with_weather: bool = True) -> Monitor:
+def build_monitor(settings: Settings, with_weather: bool = True, verifier=None) -> Monitor:
     storage = Storage(settings.db_path)
     snapshots = SnapshotStore(settings.snapshot_dir, settings.snapshot_archive_max_mb)
 
@@ -131,7 +131,7 @@ def build_monitor(settings: Settings, with_weather: bool = True) -> Monitor:
     recorder = Recorder(storage, snapshots, settings.cameras, listeners=[alerts])
     monitor_ref: dict[str, Any] = {}
     services.append(Housekeeper(settings, storage, snapshots, monitor_ref, risk))
-    monitor = Monitor(settings, sinks=[ConsoleSink(), recorder], risk=risk, services=services)
+    monitor = Monitor(settings, sinks=[ConsoleSink(), recorder], verifier=verifier, risk=risk, services=services)
     monitor_ref["monitor"] = monitor
     monitor.storage = storage
     return monitor

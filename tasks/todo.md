@@ -128,8 +128,8 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 
 ### T13: Supervisor `up` + skenario demo (Spec §12–13)
 **Acceptance criteria:**
-- [ ] `up` menjalankan monitor + web, restart saat crash, Ctrl+C bersih
-- [ ] Test skenario: api → Kebakaran Terdeteksi + 2 pesan; kabut → R5 tanpa peringatan; pembakaran sampah → POTENSI
+- [x] `up` menjalankan monitor + web, restart saat crash, Ctrl+C bersih
+- [x] Test skenario: api → Kebakaran Terdeteksi + 2 pesan; kabut → R5 tanpa peringatan; pembakaran sampah → POTENSI
 **Verification:** `pytest tests/test_supervisor.py tests/test_scenarios.py -q`
 
 ### T14: `scripts/evaluate.py`

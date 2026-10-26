@@ -6,6 +6,7 @@ import argparse
 import dataclasses
 import json
 import logging
+import signal
 import sys
 import time
 from pathlib import Path
@@ -29,6 +30,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Tampilkan log debug.")
     sub = parser.add_subparsers(dest="command", required=True, metavar="{up,run,web,check}")
+
+    up = sub.add_parser("up", help="Jalankan monitor + website sekaligus, restart otomatis bila crash.")
+    up.add_argument("--no-llm", action="store_true", help="Monitor tanpa AI (detektor lokal saja).")
+    up.add_argument("--host", help="Alamat website (default 127.0.0.1; 0.0.0.0 = bisa dibuka dari HP).")
+    up.add_argument("--port", type=int, help="Port website (default 8000).")
 
     run = sub.add_parser("run", help="Jalankan pemantauan kamera (monitor).")
     run.add_argument("--camera", metavar="ID", help="Hanya jalankan satu kamera, misalnya CAM-01.")
@@ -184,7 +190,15 @@ def cmd_check(settings: Settings) -> int:
     return 1 if any(ok is False for _, ok, _ in rows) else 0
 
 
+def _interrupt(signum, frame) -> None:
+    raise KeyboardInterrupt
+
+
 def main(argv: list[str] | None = None) -> int:
+    # SIGTERM (and CTRL+BREAK on Windows) stop as cleanly as Ctrl+C.
+    for name in ("SIGTERM", "SIGBREAK"):
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), _interrupt)
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -193,6 +207,13 @@ def main(argv: list[str] | None = None) -> int:
     setup_logging(None, args.command, args.verbose)
     try:
         settings = load_settings()
+        if args.command == "up":
+            setup_logging(settings, "supervisor", args.verbose)
+            from mataklabat.supervisor import Supervisor, default_commands
+
+            port = args.port or settings.web_port
+            print(f"MataKlabat berjalan. Dashboard: http://127.0.0.1:{port}  (Ctrl+C untuk berhenti)")
+            return Supervisor(default_commands(args.no_llm, args.host, args.port)).run()
         if args.command == "run":
             return cmd_run(settings, args)
         if args.command == "web":
