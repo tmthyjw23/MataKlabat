@@ -2,11 +2,10 @@ opencv-python>=4.9
 numpy>=1.26
 # openai: klien untuk endpoint OpenAI-compatible (9router)
 openai>=1.40
-streamlit>=1.37
-streamlit-folium>=0.20
-folium>=0.17
-plotly>=5.20
-pandas>=2.1
+fastapi>=0.110
+uvicorn>=0.29
+httpx>=0.27
+matplotlib>=3.8
 pyyaml>=6.0
 python-dotenv>=1.0
 requests>=2.31

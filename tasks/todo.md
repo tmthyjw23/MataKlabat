@@ -121,9 +121,9 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 ### T12: Website (Spec §10)
 **Description:** `web/app.py` (FastAPI read-only, SSE, header keamanan) + `web/static` (dashboard, insiden, kesehatan, Leaflet 3 lapisan).
 **Acceptance criteria:**
-- [ ] Semua endpoint Spec §10.2 teruji; ID kamera tidak valid → 404
-- [ ] Teks LLM tidak pernah dirender sebagai HTML; CSP aktif
-- [ ] Banner "data tidak live" dan "monitor tidak merespons"
+- [x] Semua endpoint Spec §10.2 teruji; ID kamera tidak valid → 404
+- [x] Teks LLM tidak pernah dirender sebagai HTML; CSP aktif
+- [x] Banner "data tidak live" dan "monitor tidak merespons"
 **Verification:** `pytest tests/test_web.py -q` + manual di browser
 
 ### T13: Supervisor `up` + skenario demo (Spec §12–13)

@@ -78,7 +78,7 @@ class Housekeeper:
         monitor = self.monitor_ref.get("monitor")
         if monitor is not None:
             if monitor.verifier is None:
-                self.storage.set_health("llm", False, "LLM tidak aktif (mode detektor lokal)")
+                self.storage.set_health("llm", None, "AI nonaktif (LLM_MODEL kosong atau --no-llm), memakai detektor lokal")
             else:
                 failing = [w.camera.id for w in monitor.workers if w._llm_failed]
                 detail = f"{self.settings.llm_model} @ {self.settings.llm_base_url}"

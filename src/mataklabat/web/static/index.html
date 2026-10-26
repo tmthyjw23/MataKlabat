@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MataKlabat · Dashboard</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 14c3-6 7-9 12-9s9 3 12 9c-3 6-7 9-12 9S5 20 2 14Z"/><circle cx="14" cy="14" r="4"/></svg>
+      <span><span class="brand-name">MataKlabat</span><br><span class="brand-sub">Pemantauan karhutla Gunung Klabat</span></span>
+    </a>
+    <div class="top-meta">
+      <span class="pill" id="system-pill" role="status"><span class="dot" aria-hidden="true"></span>Memuat…</span>
+      <span class="mono" id="clock"></span>
+      <nav class="nav" aria-label="Halaman"><a href="/health">Kesehatan sistem</a></nav>
+    </div>
+  </div>
+</header>
+
+<div class="banner warn" id="live-banner" role="status" hidden>Data tidak live, mencoba menyambung…</div>
+<div class="banner error" id="monitor-banner" role="alert" hidden></div>
+
+<main>
+  <section class="row" aria-label="Ringkasan status">
+    <article class="card wide stack" aria-labelledby="risk-title">
+      <div class="split">
+        <div>
+          <h2 class="eyebrow" id="risk-title">Risiko kebakaran kawasan · pencegahan</h2>
+          <div class="risk-level risk-unknown" id="risk-level">Memuat…</div>
+          <div class="muted" id="risk-advice"></div>
+        </div>
+        <div>
+          <div class="fwi" id="risk-fwi"></div>
+          <div class="muted small" id="risk-updated"></div>
+        </div>
+      </div>
+      <div class="scale" id="risk-scale" role="img" aria-label="Skala risiko"></div>
+      <div class="facts" id="risk-facts"></div>
+      <div class="chips" id="risk-forecast"></div>
+      <details>
+        <summary>Riwayat 30 hari</summary>
+        <div id="risk-history"></div>
+        <p class="small muted">Kelas risiko mengikuti FDRS Indonesia (de Groot dkk. 2006): kelas tertinggi dari potensi penyalaan (FFMC), kekeringan (DC), dan sulitnya pemadaman (ISI). Data cuaca: model Open-Meteo, bukan stasiun BMKG.</p>
+      </details>
+    </article>
+
+    <article class="card narrow stack" aria-labelledby="cam-status-title">
+      <h2 class="eyebrow" id="cam-status-title">Status kamera · deteksi</h2>
+      <div class="stack" id="status-counts"></div>
+      <p class="small muted">Bentuk ikon berbeda per status, jadi tetap terbaca tanpa warna.</p>
+    </article>
+  </section>
+
+  <section class="row" aria-label="Peta dan insiden aktif">
+    <article class="card wide stack">
+      <div class="split">
+        <h2>Peta kawasan</h2>
+        <span class="map-note muted" id="hotspot-note"></span>
+      </div>
+      <div class="map" id="map" role="region" aria-label="Peta Gunung Klabat dengan kamera, arah angin, dan perkiraan sebaran"></div>
+    </article>
+    <article class="card narrow stack incident none" id="incident-card" aria-live="polite"></article>
+  </section>
+
+  <section class="stack" aria-labelledby="cameras-title">
+    <h2 id="cameras-title">Kamera</h2>
+    <div class="grid" id="camera-grid"></div>
+  </section>
+
+  <section class="card stack" aria-labelledby="history-title">
+    <div class="split">
+      <h2 id="history-title">Riwayat 30 menit terakhir</h2>
+      <label class="small">Kamera <select id="history-filter"><option value="">Semua</option></select></label>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col">Waktu</th><th scope="col">Kamera</th><th scope="col">Status</th><th scope="col">Rule</th><th scope="col">Alasan</th></tr></thead>
+        <tbody id="history-body"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<footer>Prototipe akademik. Bukan pengganti sistem resmi BPBD, Manggala Agni, atau BMKG. Gambar kamera dapat berupa simulasi (video atau mode foto).</footer>
+
+<script src="/static/vendor/leaflet/leaflet.js"></script>
+<script src="/static/common.js"></script>
+<script src="/static/map.js"></script>
+<script src="/static/dashboard.js"></script>
+</body>
+</html>

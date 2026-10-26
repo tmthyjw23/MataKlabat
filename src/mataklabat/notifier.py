@@ -92,7 +92,7 @@ class OutboxSender:
 
     def start(self) -> OutboxSender:
         if self.client is None:
-            self.storage.set_health("telegram", False, "Telegram belum dikonfigurasi (pesan disimpan sebagai mode kering)")
+            self.storage.set_health("telegram", None, "Telegram belum dikonfigurasi (pesan disimpan sebagai mode kering)")
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="outbox", daemon=True)
         self._thread.start()

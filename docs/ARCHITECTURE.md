@@ -434,4 +434,8 @@ reference_points:
 | 2026-10-26 | Ringkasan pagi hanya dikirim dalam 3 jam setelah `MORNING_SUMMARY_AT` dan menunggu data cuaca hingga 15 menit; peringatan risiko naik tidak dikirim untuk nilai pertama setelah instalasi | Mencegah "ringkasan pagi" malam hari saat monitor baru dinyalakan dan peringatan palsu saat start |
 | 2026-10-26 | Tool `send_alert` dihapus dari agent: agent hanya menulis laporan; `IncidentReporter` menyimpannya dan `AlertService` memasukkannya ke outbox sebagai pesan kedua. Dalam cooldown agent atau saat agent gagal/timeout dipakai laporan template dari tool yang sama | Spec v2 §9: peringatan tidak menunggu agent; pesan kedua selalu ada; jalur kirim tunggal lewat outbox |
 | 2026-10-26 | `get_weather` agent memakai snapshot RiskService (Open-Meteo titik Puncak Klabat), bukan panggilan API baru | Satu sumber data cuaca untuk seluruh sistem; tidak menambah panggilan jaringan |
+| 2026-10-26 | Website FastAPI read-only + HTML/CSS/JS biasa (tanpa build step), Leaflet 1.9.4 disimpan lokal (hash SRI cocok dengan rilis resmi). Streamlit, folium, plotly, pandas dihapus dari dependensi | Spec v2 §10, keputusan pemilik (D6) |
+| 2026-10-26 | Live update: SSE `/api/stream` hanya mengirim sinyal "ada perubahan" (dicek tiap 1 dtk); halaman mengambil ulang JSON. Fallback refresh tiap 15 dtk | Sederhana dan tahan proxy; tidak perlu WebSocket |
+| 2026-10-26 | `Referrer-Policy: strict-origin-when-cross-origin` (bukan `no-referrer`) | Kebijakan tile OpenStreetMap meminta Referer; hanya origin yang dikirim |
+| 2026-10-26 | Kesehatan komponen punya status ketiga "Nonaktif" (`ok=-1`) untuk AI/Telegram yang sengaja tidak diisi | Tidak menampilkan merah "Bermasalah" untuk konfigurasi yang disengaja |
 | | *(agent menambahkan baris di sini)* | |

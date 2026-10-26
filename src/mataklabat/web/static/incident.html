@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MataKlabat · Insiden</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 14c3-6 7-9 12-9s9 3 12 9c-3 6-7 9-12 9S5 20 2 14Z"/><circle cx="14" cy="14" r="4"/></svg>
+      <span><span class="brand-name">MataKlabat</span><br><span class="brand-sub">Detail insiden</span></span>
+    </a>
+    <div class="top-meta">
+      <span class="mono" id="clock"></span>
+      <nav class="nav" aria-label="Halaman"><a href="/">Dashboard</a><a href="/health">Kesehatan sistem</a></nav>
+    </div>
+  </div>
+</header>
+<div class="banner warn" id="live-banner" role="status" hidden>Data tidak live, mencoba menyambung…</div>
+
+<main id="incident-main" aria-live="polite">
+  <p class="muted">Memuat insiden…</p>
+</main>
+<footer>Laporan AI dan keputusan otomatis perlu diverifikasi di lapangan.</footer>
+
+<script src="/static/common.js"></script>
+<script src="/static/incident.js"></script>
+</body>
+</html>

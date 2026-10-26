@@ -127,12 +127,12 @@ class CameraSource(FrameSource):
     def _open(self) -> cv2.VideoCapture | None:
         source = self.camera.source
         if self.is_file and not Path(source).is_file():
-            self._fail(f"file video tidak ditemukan: {source}")
+            self._fail(f"file video tidak ditemukan: {_short(source)}")
             return None
         cap = cv2.VideoCapture(source)
         if not cap.isOpened():
             cap.release()
-            self._fail(f"sumber tidak bisa dibuka: {source}")
+            self._fail(f"sumber tidak bisa dibuka: {_short(source)}")
             return None
         self.last_error = None
         log.info("Kamera %s terhubung (%s).", self.camera.id, source)
@@ -229,11 +229,11 @@ class FolderSource(FrameSource):
 
     def _newest_photo(self) -> tuple[Path, str] | None:
         if not self.folder.is_dir():
-            self._fail(f"folder foto tidak ditemukan: {self.folder}")
+            self._fail(f"folder foto tidak ditemukan: {_short(self.folder)}")
             return None
         photos = [p for p in self.folder.iterdir() if p.is_file() and p.suffix.lower() in PHOTO_EXTENSIONS]
         if not photos:
-            self._fail(f"folder belum berisi foto: {self.folder}")
+            self._fail(f"folder belum berisi foto: {_short(self.folder)}")
             return None
         newest = max(photos, key=lambda p: p.stat().st_mtime_ns)
         return newest, f"{newest.name}@{newest.stat().st_mtime_ns}"
@@ -256,6 +256,14 @@ def _read_image(path: Path) -> np.ndarray | None:
     if data.size == 0:
         return None
     return cv2.imdecode(data, cv2.IMREAD_COLOR)
+
+
+def _short(source: int | str | Path) -> str:
+    """Last two path parts (e.g. videos/cam02.mp4), so messages stay readable on the web."""
+    if isinstance(source, int) or "://" in str(source):
+        return str(source)
+    parts = Path(source).parts
+    return "/".join(parts[-2:])
 
 
 def open_source(camera: CameraConfig) -> CameraSource | FolderSource:

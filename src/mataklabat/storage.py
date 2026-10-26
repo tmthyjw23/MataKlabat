@@ -337,12 +337,13 @@ class Storage:
 
     # --- health and retention -------------------------------------------------------------
 
-    def set_health(self, component: str, ok: bool, detail: str = "") -> None:
+    def set_health(self, component: str, ok: bool | None, detail: str = "") -> None:
+        """ok=None marks a component that is switched off on purpose (stored as -1)."""
         with self._tx() as c:
             c.execute(
                 "INSERT INTO component_health (component, ok, detail, ts) VALUES (?,?,?,?)"
                 " ON CONFLICT(component) DO UPDATE SET ok=excluded.ok, detail=excluded.detail, ts=excluded.ts",
-                (component, int(ok), detail[:300], iso()),
+                (component, -1 if ok is None else int(ok), detail[:300], iso()),
             )
 
     def prune(self, now: datetime, keep_days: int) -> int:
@@ -428,7 +429,7 @@ class ReadStore:
 
     def events(self, camera_id: str | None, since: str, limit: int = 500) -> list[dict[str, Any]]:
         sql = ("SELECT id, ts, camera_id, level, sub_status, rule, fire_score, smoke_score, risk_level,"
-               " llm_json, trace_json FROM events WHERE ts>=?")
+               " llm_json, trace_json, snapshot_path FROM events WHERE ts>=?")
         params: tuple = (since,)
         if camera_id:
             sql += " AND camera_id=?"
@@ -458,6 +459,10 @@ class ReadStore:
 
     def health(self) -> list[dict[str, Any]]:
         return self._all("SELECT * FROM component_health ORDER BY component")
+
+    def event_snapshot_path(self, event_id: int) -> str | None:
+        row = self._one("SELECT snapshot_path FROM events WHERE id=?", (event_id,))
+        return None if row is None else row["snapshot_path"]
 
     def latest_event_id(self) -> int:
         row = self._one("SELECT MAX(id) AS id FROM events")

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MataKlabat · Kesehatan sistem</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-inner">
+    <a class="brand" href="/">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 14c3-6 7-9 12-9s9 3 12 9c-3 6-7 9-12 9S5 20 2 14Z"/><circle cx="14" cy="14" r="4"/></svg>
+      <span><span class="brand-name">MataKlabat</span><br><span class="brand-sub">Kesehatan sistem</span></span>
+    </a>
+    <div class="top-meta">
+      <span class="mono" id="clock"></span>
+      <nav class="nav" aria-label="Halaman"><a href="/">Dashboard</a></nav>
+    </div>
+  </div>
+</header>
+<div class="banner warn" id="live-banner" role="status" hidden>Data tidak live, mencoba menyambung…</div>
+<div class="banner error" id="monitor-banner" role="alert" hidden></div>
+
+<main>
+  <section class="card stack" aria-labelledby="components-title">
+    <h1 id="components-title">Komponen</h1>
+    <div class="table-wrap"><table>
+      <thead><tr><th scope="col">Komponen</th><th scope="col">Status</th><th scope="col">Keterangan</th><th scope="col">Diperbarui</th></tr></thead>
+      <tbody id="components"></tbody>
+    </table></div>
+  </section>
+  <section class="card stack" aria-labelledby="cameras-title">
+    <h2 id="cameras-title">Kamera</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th scope="col">Kamera</th><th scope="col">Sumber</th><th scope="col">Status</th><th scope="col">Keterangan</th></tr></thead>
+      <tbody id="cameras"></tbody>
+    </table></div>
+  </section>
+  <section class="card stack" aria-labelledby="outbox-title">
+    <h2 id="outbox-title">Antrean Telegram</h2>
+    <p class="small muted" id="config"></p>
+    <div class="table-wrap"><table>
+      <thead><tr><th scope="col">#</th><th scope="col">Jenis</th><th scope="col">Status</th><th scope="col">Dibuat</th><th scope="col">Catatan</th></tr></thead>
+      <tbody id="outbox"></tbody>
+    </table></div>
+  </section>
+</main>
+
+<script src="/static/common.js"></script>
+<script src="/static/health.js"></script>
+</body>
+</html>

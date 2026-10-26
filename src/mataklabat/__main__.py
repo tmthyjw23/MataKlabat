@@ -1,4 +1,4 @@
-"""Command line entry point: `python -m mataklabat {run,check}`."""
+"""Command line entry point: `python -m mataklabat {up,run,web,check}`."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="MataKlabat: sistem peringatan dini karhutla Gunung Klabat.",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Tampilkan log debug.")
-    sub = parser.add_subparsers(dest="command", required=True, metavar="{run,check}")
+    sub = parser.add_subparsers(dest="command", required=True, metavar="{up,run,web,check}")
 
     run = sub.add_parser("run", help="Jalankan pemantauan kamera (monitor).")
     run.add_argument("--camera", metavar="ID", help="Hanya jalankan satu kamera, misalnya CAM-01.")
@@ -37,6 +37,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--duration", type=float, metavar="DETIK", help="Berhenti otomatis setelah sekian detik."
     )
+
+    web = sub.add_parser("web", help="Jalankan website dashboard (hanya-baca).")
+    web.add_argument("--host", help="Alamat bind (default 127.0.0.1; 0.0.0.0 = bisa dibuka dari HP di jaringan yang sama).")
+    web.add_argument("--port", type=int, help="Port (default 8000).")
 
     check = sub.add_parser("check", help="Cek konfigurasi, kamera, LLM (9router), dan koneksi cuaca.")
     check.add_argument(
@@ -191,6 +195,12 @@ def main(argv: list[str] | None = None) -> int:
         settings = load_settings()
         if args.command == "run":
             return cmd_run(settings, args)
+        if args.command == "web":
+            setup_logging(settings, "web", args.verbose)
+            from mataklabat.web.app import run_web
+
+            run_web(settings, args.host, args.port)
+            return 0
         if args.llm_sample:
             return cmd_llm_sample(settings, args.llm_sample, args.prompt)
         return cmd_check(settings)
