@@ -10,4 +10,6 @@ pyyaml>=6.0
 python-dotenv>=1.0
 requests>=2.31
 pytest>=8.0
+# tzdata: zona waktu Asia/Makassar di Windows
+tzdata>=2024.1
 # opsional: pip install ultralytics   (hanya jika YOLO_WEIGHTS diisi)

@@ -19,9 +19,9 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 ### T2: CameraSource + perintah `check`
 **Description:** `CameraSource` mendukung int (webcam), path video (loop otomatis saat EOF), dan URL RTSP. Thread pembaca menyimpan frame terbaru. `latest()` mengembalikan `Frame | None`, dan `online` false jika > 5 dtk tanpa frame. `check` menguji setiap kamera, API key (panggilan teks kecil ke Gemini), dan Open-Meteo.
 **Acceptance criteria:**
-- [ ] Webcam dan 1 video bisa dibaca bersamaan
-- [ ] Video berulang tanpa error saat habis
-- [ ] `check` mencetak tabel ✅/❌ per komponen
+- [x] Webcam dan 1 video bisa dibaca bersamaan
+- [x] Video berulang tanpa error saat habis
+- [x] `check` mencetak tabel ✅/❌ per komponen
 
 **Verification:** `python -m mataklabat check` · `pytest tests/test_camera.py -q` (memakai video sintetis 1 dtk yang dibuat di test)
 **Dependencies:** T1 · **Files:** `camera.py`, `__main__.py`, `tests/test_camera.py` · **Scope:** S

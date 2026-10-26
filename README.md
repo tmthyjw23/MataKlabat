@@ -85,12 +85,12 @@ Detail komponen, aturan keputusan, skema JSON LLM, dan skema database ada di [`d
 ### Instalasi
 
 ```bash
-git clone https://github.com/<username>/mataklabat.git
-cd mataklabat
+git clone https://github.com/tmthyjw23/MataKlabat.git
+cd MataKlabat
 python -m venv .venv
 # Windows: .venv\Scripts\activate    |   macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env        # lalu isi GEMINI_API_KEY
+pip install -e .            # memasang paket mataklabat + semua dependensi
+cp .env.example .env        # Windows: copy .env.example .env  — lalu isi GEMINI_API_KEY
 ```
 
 ### Menjalankan
@@ -173,6 +173,7 @@ Lihat [`docs/DEMO.md`](docs/DEMO.md). Ringkasnya:
 mataklabat/
 ├── README.md
 ├── AGENTS.md                 # instruksi untuk AI coding agent
+├── pyproject.toml            # paket Python (pip install -e .)
 ├── requirements.txt
 ├── .env.example
 ├── app.py                    # dashboard Streamlit

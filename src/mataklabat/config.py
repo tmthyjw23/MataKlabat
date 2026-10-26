@@ -9,8 +9,10 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass, field, fields
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import yaml
 from dotenv import load_dotenv
@@ -24,6 +26,11 @@ PROMPT_VERSIONS = ("v1", "v2")
 
 _PLACEHOLDER_PREFIX = "isi_"  # values copied unchanged from .env.example
 _TRUE_VALUES = {"1", "true", "yes", "ya", "on"}
+
+
+def now_local() -> datetime:
+    """Current time as an aware datetime in the display timezone (Asia/Makassar)."""
+    return datetime.now(ZoneInfo(TIMEZONE))
 
 
 class ConfigError(ValueError):

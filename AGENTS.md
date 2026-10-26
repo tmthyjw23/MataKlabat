@@ -28,7 +28,7 @@ Kamu membangun **MataKlabat**, sistem peringatan dini karhutla Gunung Klabat (Py
 ## Perintah
 
 ```bash
-pip install -r requirements.txt
+pip install -e .
 python -m mataklabat check
 python -m mataklabat run [--camera CAM-01] [--no-llm] [--prompt v1|v2]
 streamlit run app.py
