@@ -31,7 +31,7 @@ Opsional: arahkan **video** api di HP ke webcam CAM-01 untuk menunjukkan kamera 
 ## Checklist persiapan
 
 ### H-7: bahan dan akun
-- [ ] **Test set** ≥ 10 foto per kelas di `data/test_set/{fire,smoke,fog,sunset,lights,normal}/` (dataset publik seperti D-Fire, atau foto berlisensi bebas). Catat sumber dan lisensi di `data/test_set/SOURCES.md`
+- [x] **Test set** 12 foto per kelas + foto demo + video: `python scripts/fetch_media.py` (sumber dan lisensi di `data/MEDIA_SOURCES.md`)
 - [ ] **Foto demo** untuk CAM-04 (simpan di folder lain, misalnya `data/demo/bahan/`): asap di lereng, api, kabut gunung, pembakaran sampah, senja
 - [ ] **2 video stok** hutan normal → `data/videos/cam02.mp4`, `cam03.mp4` (< 20 MB, lisensi bebas)
 - [ ] (Opsional) 1 video api untuk diputar di HP

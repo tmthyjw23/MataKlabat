@@ -12,3 +12,10 @@ data/demo/**/*.jpg
 data/demo/**/*.jpeg
 data/demo/**/*.png
 data/demo/**/*.webp
+
+# Media unduhan (lihat data/MEDIA_SOURCES.md, scripts/fetch_media.py)
+data/test_set/**/*.jpg
+data/test_set/**/*.jpeg
+data/test_set/**/*.png
+data/test_set/**/*.webp
+data/videos/*.part
