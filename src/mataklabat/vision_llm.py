@@ -229,14 +229,19 @@ class VisionVerifier:
         prompt_version: str | None = None,
         *,
         block: bool = True,
+        limit: bool = True,
     ) -> LLMVerdict:
-        """Ask the LLM about one image. `block=False` returns `rate_limited` instead of waiting."""
+        """Ask the LLM about one image.
+
+        `block=False` returns `rate_limited` instead of waiting. `limit=False` skips the
+        limiter for callers that already acquired it (the pipeline's LLMScheduler).
+        """
         version = prompt_version or self.settings.prompt_version
         if not self.settings.llm_enabled:
             return LLMVerdict.failed("llm_disabled", version, self.model)
-        if block:
+        if limit and block:
             self.limiter.acquire()
-        elif not self.limiter.try_acquire():
+        elif limit and not self.limiter.try_acquire():
             return LLMVerdict.failed("rate_limited", version, self.model)
 
         image = frame.image if isinstance(frame, Frame) else frame

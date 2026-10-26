@@ -70,9 +70,9 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 ### T6: Decision Engine lengkap (§6.2–6.5)
 **Description:** Semua rule R0–R6, window konfirmasi, ambang dinamis berdasarkan FRI (sementara FRI di-mock), sub-status, dan `trace` dengan `explanation` dari template deterministik. Trigger T1–T3 di `CameraWorker`.
 **Acceptance criteria:**
-- [ ] Unit test untuk setiap rule R0–R6 termasuk urutan prioritas
-- [ ] `lookalike="fog_cloud"` dengan confidence 0.95 **tidak** menghasilkan BAHAYA (R5)
-- [ ] 1 verdict dengan confidence 0.92 cukup untuk BAHAYA. Verdict 0.75 butuh 2/3
+- [x] Unit test untuk setiap rule R0–R6 termasuk urutan prioritas
+- [x] `lookalike="fog_cloud"` dengan confidence 0.95 **tidak** menghasilkan BAHAYA (R5)
+- [x] 1 verdict dengan confidence 0.92 cukup untuk BAHAYA. Verdict 0.75 butuh 2/3
 
 **Verification:** `pytest tests/test_decision.py -q`
 **Dependencies:** T4, T5 · **Files:** `decision.py`, `pipeline.py`, `tests/test_decision.py` · **Scope:** M

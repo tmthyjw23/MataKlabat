@@ -60,8 +60,6 @@ def cmd_run(settings: Settings, args: argparse.Namespace) -> int:
     print(f"MataKlabat: {len(settings.cameras)} kamera, {mode}.")
     for cam in settings.cameras:
         print(f"  {cam.id}  {cam.name}  (sumber: {cam.source})")
-    if settings.llm_enabled:
-        print("Catatan: verifikasi LLM baru dipakai Decision Engine di T6, sementara memakai detektor lokal.")
     Monitor(settings).run_forever(duration_s=args.duration)
     return 0
 

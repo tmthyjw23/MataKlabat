@@ -68,7 +68,7 @@ def test_r6_steps_down_after_clear_steps(engine):
     assert rules[2:6] == ["R6"] * 4
     held, dropped = decisions[2:5], decisions[5]
     assert all(d.level == Level.WASPADA and d.sub_status == "unverified" for d in held)
-    assert "menunggu" in held[0].explanation
+    assert "1/4 langkah bersih" in held[0].explanation
     assert dropped.level == Level.AMAN and dropped.changed and dropped.sub_status is None
     assert "Turun dari WASPADA ke AMAN" in dropped.explanation
     assert rules[6:] == ["R0"] * 4
@@ -113,3 +113,157 @@ def test_level_lower():
     assert Level.BAHAYA.lower() == Level.WASPADA
     assert Level.WASPADA.lower() == Level.AMAN
     assert Level.AMAN.lower() == Level.AMAN
+
+
+# --- T6: rules with LLM verdicts ---------------------------------------------------
+
+from mataklabat.decision import fri_category  # noqa: E402
+from mataklabat.vision_llm import LLMVerdict  # noqa: E402
+
+
+def v(conf=0.8, *, smoke=True, fire=False, hazard=None, lookalike="none", risks=(), error=None):
+    if hazard is None:
+        hazard = "smoke_and_flame" if fire and smoke else "flame" if fire else "smoke" if smoke else "none"
+    return LLMVerdict(
+        fire_visible=fire, smoke_visible=smoke, hazard_type=hazard, lookalike=lookalike,
+        confidence=conf, risk_factors=tuple(risks), prompt_version="v2", error=error,
+    )
+
+
+CLEAN_V = v(0.9, smoke=False)
+
+
+def step(engine, verdict=None, scores=CLEAN, fri=None, llm_available=True):
+    local = LocalDetection("CAM-01", now_local(), *scores)
+    return engine.update(local, verdict=verdict, llm_available=llm_available, fri=fri)
+
+
+def test_r1_single_verdict_above_090_is_enough(engine):
+    d = step(engine, v(0.92))
+    assert (d.level, d.rule, d.sub_status) == (Level.BAHAYA, "R1", None)
+    assert "cukup 1 cek" in d.explanation and "0.92 ≥ 0.70" in d.explanation
+
+
+def test_r1_verdict_075_needs_two_of_three(engine):
+    first = step(engine, v(0.75))
+    assert (first.level, first.rule) == (Level.WASPADA, "R2")
+    assert "baru 1 dari 2" in first.explanation
+    second = step(engine, v(0.75))
+    assert (second.level, second.rule) == (Level.BAHAYA, "R1")
+    assert "terkonfirmasi 2 dari 3" in second.explanation
+    assert second.trace["inputs"]["confirm"] == "2/3"
+
+
+def test_r1_confirmation_window_slides(engine):
+    for verdict in (v(0.75), CLEAN_V, CLEAN_V):
+        step(engine, verdict)
+    d = step(engine, v(0.75))  # window = [clean, clean, 0.75] -> 1/3
+    assert d.level == Level.WASPADA and d.rule == "R2"
+
+
+def test_r2_confidence_between_warn_and_danger(engine):
+    d = step(engine, v(0.55))
+    assert (d.level, d.rule) == (Level.WASPADA, "R2")
+    assert "di bawah ambang BAHAYA 0.70" in d.explanation
+
+
+def test_positive_below_conf_warn_is_not_evidence(engine):
+    d = step(engine, v(0.30))
+    assert (d.level, d.rule) == (Level.AMAN, "R0")
+
+
+def test_r2_uncertain_only_with_active_t1(engine):
+    calm = step(engine, v(0.3, smoke=False, hazard="uncertain"))
+    assert calm.level == Level.AMAN
+    feed(engine, HIT, times=2, llm_available=True)
+    d = step(engine, v(0.3, smoke=False, hazard="uncertain"), scores=HIT)
+    assert (d.level, d.rule) == (Level.WASPADA, "R2") and "ragu" in d.explanation
+
+
+def test_r3_potential_risk_factor(engine):
+    d = step(engine, v(0.8, smoke=False, risks=["campfire", "dry_vegetation"]))
+    assert (d.level, d.rule, d.sub_status) == (Level.WASPADA, "R3", "POTENSI")
+    assert "api unggun" in d.explanation
+
+
+def test_dry_vegetation_alone_is_not_r3(engine):
+    assert step(engine, v(0.8, smoke=False, risks=["dry_vegetation"])).level == Level.AMAN
+
+
+def test_r5_fog_with_high_confidence_is_never_bahaya(engine):
+    d = step(engine, v(0.95, lookalike="fog_cloud"))
+    assert (d.level, d.rule, d.sub_status) == (Level.AMAN, "R5", "rejected_lookalike")
+    assert "kabut/awan" in d.explanation
+    for _ in range(3):
+        assert step(engine, v(0.95, lookalike="fog_cloud")).level == Level.AMAN
+
+
+def test_r5_keeps_current_level(engine):
+    step(engine, v(0.55))  # WASPADA via R2
+    d = step(engine, v(0.95, lookalike="sunset_glare"))
+    assert (d.level, d.rule) == (Level.WASPADA, "R5")
+
+
+@pytest.mark.parametrize(
+    ("verdict", "rule"),
+    [
+        (v(0.95, risks=["campfire"]), "R1"),  # R1 beats R3
+        (v(0.55, risks=["campfire"]), "R2"),  # R2 beats R3
+        (v(0.95, lookalike="fog_cloud", risks=["campfire"]), "R3"),  # R3 beats R5
+    ],
+)
+def test_rule_priority(engine, verdict, rule):
+    assert step(engine, verdict).rule == rule
+
+
+def test_high_fri_lowers_danger_threshold(engine):
+    step(engine, v(0.65), fri=72)
+    d = step(engine, v(0.65), fri=72)
+    assert (d.level, d.rule) == (Level.BAHAYA, "R1")
+    assert "ambang diturunkan karena FRI 72" in d.explanation
+    assert d.trace["inputs"]["risk"] == {"fri": 72, "category": "TINGGI", "threshold_used": 0.6}
+
+
+def test_normal_fri_keeps_default_threshold(engine):
+    step(engine, v(0.65), fri=40)
+    d = step(engine, v(0.65), fri=40)
+    assert (d.level, d.rule) == (Level.WASPADA, "R2")
+
+
+def test_steps_without_verdict_keep_last_rule(engine):
+    step(engine, v(0.92))
+    d = step(engine, None, scores=HIT)
+    assert (d.level, d.rule) == (Level.BAHAYA, "R1")
+    assert d.explanation.startswith("Masih berlaku: BAHAYA")
+
+
+def test_r6_with_llm_counts_clean_verdicts_only(engine):
+    step(engine, v(0.92))
+    for _ in range(3):
+        step(engine, CLEAN_V)
+        for _ in range(5):
+            step(engine, None)  # frames between verdicts do not count
+    assert engine.level == Level.BAHAYA
+    d = step(engine, CLEAN_V)
+    assert (d.level, d.rule) == (Level.WASPADA, "R6")
+    assert "4 verdict LLM bersih" in d.explanation
+
+
+def test_failed_verdict_is_ignored(engine):
+    d = step(engine, v(0.95, error="api_error: APITimeoutError"))
+    assert d.level == Level.AMAN
+    assert d.trace["inputs"]["llm"] == {"error": "api_error: APITimeoutError", "prompt": "v2"}
+    assert len(engine.verdicts) == 0
+
+
+def test_trace_includes_llm_inputs(engine):
+    d = step(engine, v(0.86))
+    assert d.trace["inputs"]["llm"] == {
+        "hazard_type": "smoke", "confidence": 0.86, "lookalike": "none", "prompt": "v2",
+    }
+    assert d.verdict is not None and d.verdict.confidence == 0.86
+
+
+@pytest.mark.parametrize(("fri", "cat"), [(None, None), (0, "RENDAH"), (29, "RENDAH"), (30, "SEDANG"), (59, "SEDANG"), (60, "TINGGI")])
+def test_fri_category(fri, cat):
+    assert fri_category(fri) == cat

@@ -138,3 +138,115 @@ def test_ctrl_c_stops_all_workers(tmp_path):
     assert time.monotonic() - started < 8
     assert monitor.stop_event.is_set()
     assert all(not w.is_alive() for w in monitor.workers)
+
+
+# --- T6: triggers and LLM scheduling --------------------------------------------
+
+from mataklabat.pipeline import LLMScheduler, Trigger  # noqa: E402
+from mataklabat.vision_llm import LLMVerdict, RateLimiter  # noqa: E402
+
+SMOKE_095 = LLMVerdict(smoke_visible=True, hazard_type="smoke", confidence=0.95, prompt_version="v2")
+
+
+class FakeVerifier:
+    def __init__(self, verdict):
+        self.verdict = verdict
+        self.calls = 0
+        self.limiter = RateLimiter(0.0)
+
+    def verify(self, frame, ctx, prompt_version=None, *, block=True, limit=True):
+        assert limit is False  # the scheduler already took the rate-limit slot
+        self.calls += 1
+        return self.verdict
+
+
+def llm_settings(tmp_path, *cams, **overrides):
+    values = dict(llm_enabled=True, llm_model="test/vision", process_fps=10.0, recheck_s=0.5)
+    values.update(overrides)
+    return settings_for(tmp_path, *cams, **values)
+
+
+def test_scheduler_prefers_higher_priority():
+    now = [0.0]
+    scheduler = LLMScheduler(RateLimiter(10.0, clock=lambda: now[0]))
+    assert scheduler.request("C", Trigger.T1)  # takes the slot at t=0
+    now[0] = 5
+    assert not scheduler.request("B", Trigger.T2)  # rate limited, now waiting with T2
+    now[0] = 11
+    assert not scheduler.request("A", Trigger.T3)  # B outranks A
+    assert scheduler.request("B", Trigger.T2)
+    now[0] = 22
+    assert scheduler.request("A", Trigger.T3)
+
+
+def test_scheduler_withdraw_releases_priority():
+    scheduler = LLMScheduler(RateLimiter(0.0))
+    scheduler._waiting["B"] = Trigger.T2
+    assert not scheduler.request("A", Trigger.T1)
+    scheduler.withdraw("B")
+    assert scheduler.request("A", Trigger.T1)
+
+
+def test_due_trigger_order(tmp_path):
+    now = [100.0]
+    cam = CameraConfig("CAM-T", "Test", str(tmp_path / "none.mp4"), 1.4, 125.0)
+    worker = CameraWorker(
+        cam, llm_settings(tmp_path, cam, recheck_s=15, heartbeat_s=120), [], threading.Event(),
+        verifier=FakeVerifier(SMOKE_095), scheduler=LLMScheduler(RateLimiter(0.0)), clock=lambda: now[0],
+    )
+    assert worker.due_trigger() == Trigger.T3  # never checked: heartbeat is due
+    worker._last_llm_at = 100.0
+    now[0] = 110
+    assert worker.due_trigger() is None
+    for _ in range(3):
+        worker.engine.t1._hits.append(True)
+    assert worker.due_trigger() is None  # T1 active but checked 10 s ago
+    now[0] = 116
+    assert worker.due_trigger() == Trigger.T1
+    worker.engine.level = Level.WASPADA
+    assert worker.due_trigger() == Trigger.T2
+
+
+def test_no_heartbeat_when_disabled(tmp_path):
+    cam = CameraConfig("CAM-T", "Test", str(tmp_path / "none.mp4"), 1.4, 125.0)
+    worker = CameraWorker(
+        cam, llm_settings(tmp_path, cam, heartbeat_s=0), [], threading.Event(),
+        verifier=FakeVerifier(SMOKE_095), scheduler=LLMScheduler(RateLimiter(0.0)),
+    )
+    assert worker.due_trigger() is None
+
+
+def run_worker_until(tmp_path, verifier, predicate, **overrides):
+    video = make_fire_then_forest_video(tmp_path / "fire.avi", fire_s=3.0, forest_s=1.0)
+    cam = CameraConfig("CAM-T", "Test", str(video), 1.4, 125.0)
+    sink, stop = RecordingSink(), threading.Event()
+    worker = CameraWorker(
+        cam, llm_settings(tmp_path, cam, heartbeat_s=0, **overrides), [sink], stop,
+        verifier=verifier, scheduler=LLMScheduler(verifier.limiter),
+    )
+    worker.start()
+    try:
+        assert wait_for(lambda: predicate(sink.decisions)), [(d.level, d.rule) for d in sink.decisions]
+    finally:
+        stop.set()
+        worker.join(3)
+    return sink.decisions
+
+
+def test_worker_reaches_bahaya_with_llm(tmp_path):
+    verifier = FakeVerifier(SMOKE_095)
+    decisions = run_worker_until(
+        tmp_path, verifier, lambda ds: any(d.level == Level.BAHAYA for d in ds)
+    )
+    bahaya = next(d for d in decisions if d.level == Level.BAHAYA)
+    assert bahaya.rule == "R1" and bahaya.verdict is SMOKE_095
+    assert verifier.calls >= 1
+
+
+def test_worker_falls_back_to_r4_when_llm_fails(tmp_path):
+    verifier = FakeVerifier(LLMVerdict.failed("api_error: APIConnectionError", "v2"))
+    decisions = run_worker_until(
+        tmp_path, verifier, lambda ds: any(d.rule == "R4" for d in ds)
+    )
+    r4 = next(d for d in decisions if d.rule == "R4")
+    assert r4.level == Level.WASPADA and r4.sub_status == "unverified"
