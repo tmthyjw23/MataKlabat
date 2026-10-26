@@ -6,6 +6,7 @@ import logging
 import threading
 from typing import Any
 
+from mataklabat.agent import IncidentAgent, IncidentReporter
 from mataklabat.alerts import AlertService
 from mataklabat.config import Settings, now_local
 from mataklabat.notifier import OutboxSender, TelegramClient
@@ -14,6 +15,7 @@ from mataklabat.recorder import Recorder
 from mataklabat.risk import RiskService
 from mataklabat.snapshots import SnapshotStore
 from mataklabat.storage import Storage, risk_to_dict
+from mataklabat.tools import IncidentTools
 
 log = logging.getLogger(__name__)
 
@@ -115,12 +117,16 @@ def build_monitor(settings: Settings, with_weather: bool = True) -> Monitor:
         return None if snap is None else risk_to_dict(snap)
 
     alerts = AlertService(settings, storage, risk_provider=risk_provider)
+    tools = IncidentTools(settings, risk_provider, recent_events=storage.recent_events)
+    agent = IncidentAgent(settings, tools) if settings.llm_enabled else None
+    reporter = IncidentReporter(settings, storage, tools, alerts.enqueue_report, agent)
+    alerts.report_requester = reporter.request
     if risk is not None:
         risk.listeners.append(alerts.on_risk)
     telegram = None
     if settings.telegram_bot_token and settings.telegram_chat_id:
         telegram = TelegramClient(settings.telegram_bot_token, settings.telegram_chat_id)
-    services: list[Any] = [alerts, OutboxSender(storage, telegram)]
+    services: list[Any] = [alerts, reporter, OutboxSender(storage, telegram)]
 
     recorder = Recorder(storage, snapshots, settings.cameras, listeners=[alerts])
     monitor_ref: dict[str, Any] = {}

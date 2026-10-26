@@ -197,3 +197,17 @@ def _risk_detail(risk: dict) -> list[str]:
         lines.append(f"• Prakiraan: {days}")
     lines.append(f"Saran: {risk['advice']}")
     return lines
+
+
+def report_message(camera: CameraConfig, incident_id: int, report_md: str) -> str:
+    """Markdown report as plain Telegram text: '## Title' becomes an upper-case line."""
+    lines = [f"📋 LAPORAN INSIDEN #{incident_id} · {camera.id} {camera.name}", ""]
+    for raw in report_md.splitlines():
+        line = raw.rstrip()
+        if line.startswith("#"):
+            line = line.lstrip("#").strip().upper()
+        line = line.replace("**", "")
+        if line.startswith("_") and line.endswith("_") and len(line) > 2:
+            line = line[1:-1]
+        lines.append(line)
+    return fit("\n".join(lines).strip(), MESSAGE_LIMIT)

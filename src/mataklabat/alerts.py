@@ -93,6 +93,13 @@ class AlertService:
         text = messages.check_alert(decision, camera, self.risk_provider(), self.settings.public_url)
         self._enqueue("check", text, camera_id=camera.id, photo_path=None if photo is None else str(photo))
 
+    def enqueue_report(self, incident_id: int, camera, report_md: str) -> int:
+        """Second message of an incident: the agent (or template) report."""
+        return self._enqueue(
+            "report", messages.report_message(camera, incident_id, report_md),
+            camera_id=camera.id, incident_id=incident_id,
+        )
+
     def on_incident_closed(self, incident_id: int, decision: Decision) -> None:
         log.info("%s: insiden #%d selesai (kembali Normal).", decision.camera_id, incident_id)
 

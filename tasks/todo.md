@@ -113,9 +113,9 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 ### T11: AI Agent + tools (Spec §9)
 **Description:** `tools.py`, `agent.py` (tool calling 9router, maks 6 langkah, 60 dtk), laporan template cadangan.
 **Acceptance criteria:**
-- [ ] Angin dari 270° → sebaran ke 90°
-- [ ] Laporan 6 bagian + label AI; tanpa FIRMS → "tidak tersedia"
-- [ ] Agent gagal/timeout → laporan template
+- [x] Angin dari 270° → sebaran ke 90°
+- [x] Laporan 6 bagian + label AI; tanpa FIRMS → "tidak tersedia"
+- [x] Agent gagal/timeout → laporan template
 **Verification:** `pytest tests/test_tools.py tests/test_agent.py -q`
 
 ### T12: Website (Spec §10)
