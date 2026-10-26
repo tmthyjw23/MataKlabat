@@ -33,9 +33,9 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 ### T3: ColorMotionDetector (§4.1)
 **Description:** Implementasi mask api, asap, dan gerak, `fire_score`, `smoke_score`, serta `boxes`. Interface `Detector.detect(frame) -> LocalDetection`. Slot `YoloDetector` dengan lazy import.
 **Acceptance criteria:**
-- [ ] Gambar sintetis oranye berkedip memberi `fire_score` > 0.15. Gambar hijau statis memberi < 0.05
-- [ ] Gambar oranye **statis** (tanpa gerak) memberi `fire_score` < 0.05
-- [ ] ≥ 15 FPS pada frame 640 px di CPU laptop
+- [x] Gambar sintetis oranye berkedip memberi `fire_score` > 0.15. Gambar hijau statis memberi < 0.05
+- [x] Gambar oranye **statis** (tanpa gerak) memberi `fire_score` < 0.05
+- [x] ≥ 15 FPS pada frame 640 px di CPU laptop
 
 **Verification:** `pytest tests/test_detector.py -q`
 **Dependencies:** T1 · **Files:** `detector.py`, `tests/test_detector.py` · **Scope:** S

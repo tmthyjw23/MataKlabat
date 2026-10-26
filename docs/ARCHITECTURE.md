@@ -412,4 +412,5 @@ reference_points:
 | 2026-10-26 | `pyproject.toml` (src layout) + `pip install -e .` | Supaya `python -m mataklabat` jalan dari mana saja tanpa mengatur `PYTHONPATH`. Dependensi tetap dibaca dari `requirements.txt` |
 | 2026-10-26 | Nama env konstanta = nama field `Settings` huruf besar; trigger §4.3 memakai `FIRE_TRIGGER`, `SMOKE_TRIGGER`, `TRIGGER_WINDOW`, `TRIGGER_MIN_HITS`, dan `CONF_SINGLE_CONFIRM` (0.90) untuk konfirmasi 1 verdict | Dokumen belum memberi nama untuk konstanta ini. Satu aturan penamaan untuk semua override |
 | 2026-10-26 | Nilai env berawalan `isi_` dianggap kosong | `.env` yang disalin mentah dari `.env.example` tidak boleh dianggap API key sungguhan |
+| 2026-10-26 | `boxes` diambil dari `connectedComponentsWithStats`, bukan `findContours`; luas = jumlah piksel komponen; mask gerak di-dilate 5×5 sebanyak 2 iterasi | `findContours` + `contourArea` turun ke 12 FPS pada frame bising (noise sensor malam). Connected components tetap ≥ 30 FPS di kasus terburuk |
 | | *(agent menambahkan baris di sini)* | |
