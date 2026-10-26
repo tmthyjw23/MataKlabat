@@ -35,9 +35,15 @@ class Level(StrEnum):
     def lower(self) -> Level:
         return _ORDER[max(0, self.rank - 1)]
 
+    @property
+    def label(self) -> str:
+        """Name shown to people (Spec §3.2); the enum value stays the internal/DB name."""
+        return _LABELS[self]
+
 
 _ORDER = (Level.AMAN, Level.WASPADA, Level.BAHAYA)
 _RANK = {level: i for i, level in enumerate(_ORDER)}
+_LABELS = {Level.AMAN: "Normal", Level.WASPADA: "Perlu Dicek", Level.BAHAYA: "Kebakaran Terdeteksi"}
 
 SUB_POTENSI = "POTENSI"
 SUB_UNVERIFIED = "unverified"
@@ -223,7 +229,7 @@ class DecisionEngine:
                 self._raise_to(Level.WASPADA, None)
                 return self._remember(
                     "R2",
-                    f"WASPADA karena LLM ragu (uncertain, keyakinan {v.confidence:.2f}) sementara "
+                    f"Perlu Dicek karena AI ragu (uncertain, keyakinan {v.confidence:.2f}) sementara "
                     f"detektor lokal aktif pada {self.t1.describe()} frame terakhir.",
                 )
             if potential:
@@ -231,7 +237,7 @@ class DecisionEngine:
                 names = ", ".join(_RISK_NAMES[r] for r in potential)
                 return self._remember(
                     "R3",
-                    f"WASPADA (POTENSI) karena LLM melihat faktor risiko: {names}. "
+                    f"Perlu Dicek (potensi) karena AI melihat faktor risiko: {names}. "
                     "Belum ada api atau asap kebakaran.",
                 )
             if v.positive and v.lookalike != "none":
@@ -240,7 +246,7 @@ class DecisionEngine:
                 lookalike = _LOOKALIKE_NAMES.get(v.lookalike, v.lookalike)
                 return self._remember(
                     "R5",
-                    f"Tetap {self.level.value}: LLM melihat {what} (keyakinan {v.confidence:.2f}) "
+                    f"Tetap {self.level.label}: AI melihat {what} (keyakinan {v.confidence:.2f}) "
                     f"tetapi menilainya sebagai lookalike ({lookalike}), sehingga ditolak.",
                 )
             clean_step = True
@@ -253,16 +259,16 @@ class DecisionEngine:
 
         if not clean_step:
             if self.level == Level.AMAN:
-                waiting = " T1 aktif, menunggu verifikasi LLM." if self.t1.active else ""
-                return "R0", f"AMAN karena belum ada verdict LLM yang menunjukkan bahaya.{waiting}"
+                waiting = " Detektor lokal aktif, menunggu verifikasi AI." if self.t1.active else ""
+                return "R0", f"Normal karena belum ada verifikasi AI yang menunjukkan kebakaran.{waiting}"
             return self._last_rule, f"Masih berlaku: {self._last_explanation}"
 
         if self.level != Level.AMAN:
             return self._remember("R6", self._step_clear(llm_available))
         self.sub_status = None
         self._clear_steps = 0
-        source = "verdict LLM" if llm_available else "detektor lokal"
-        return self._remember("R0", f"AMAN karena tidak ada bukti api atau asap dari {source}.")
+        source = "verifikasi AI" if llm_available else "detektor lokal"
+        return self._remember("R0", f"Normal karena tidak ada bukti api atau asap dari {source}.")
 
     def _confirmations(self, threshold: float) -> int:
         return sum(
@@ -281,17 +287,17 @@ class DecisionEngine:
         level_from = self.level
         self._clear_steps += 1
         needed = self.settings.clear_steps
-        unit = "verdict LLM bersih" if llm_available else "langkah bersih"
+        unit = "verifikasi AI bersih" if llm_available else "langkah bersih"
         if self._clear_steps < needed:
             return (
-                f"Tetap {level_from.value}: tidak ada bukti baru, "
+                f"Tetap {level_from.label}: tidak ada bukti baru, "
                 f"{self._clear_steps}/{needed} {unit} sebelum turun level."
             )
         self.level = level_from.lower()
         self.sub_status = None
         self._clear_steps = 0
         return (
-            f"Turun dari {level_from.value} ke {self.level.value} karena "
+            f"Turun dari {level_from.label} ke {self.level.label} karena "
             f"{needed} {unit} berturut-turut tanpa bukti api atau asap."
         )
 
@@ -311,25 +317,25 @@ class DecisionEngine:
         else:
             confirm = f"cukup 1 cek karena keyakinan ≥ {s.conf_single_confirm:.2f}"
         return (
-            f"BAHAYA karena LLM melihat {_hazard_words(v)} ({v.confidence:.2f} ≥ {threshold:.2f}"
+            f"Kebakaran Terdeteksi karena AI melihat {_hazard_words(v)} ({v.confidence:.2f} ≥ {threshold:.2f}"
             f"{lowered}), bukan lookalike, {confirm}."
         )
 
     def _explain_r2(self, v: LLMVerdict, threshold: float, confirmations: int) -> str:
         s = self.settings
         if v.confidence < threshold:
-            reason = f"di bawah ambang BAHAYA {threshold:.2f}"
+            reason = f"di bawah ambang kebakaran {threshold:.2f}"
         else:
             reason = f"baru {confirmations} dari {s.confirm_min} konfirmasi yang dibutuhkan"
-        return f"WASPADA karena LLM melihat {_hazard_words(v)} dengan keyakinan {v.confidence:.2f} ({reason})."
+        return f"Perlu Dicek karena AI melihat {_hazard_words(v)} dengan keyakinan {v.confidence:.2f} ({reason})."
 
     def _explain_r4(self) -> str:
         s = self.settings
         local = self._last_observed
         return (
-            f"WASPADA (belum terverifikasi) karena detektor lokal melihat tanda api/asap pada "
+            f"Perlu Dicek (belum terverifikasi) karena detektor lokal melihat tanda api/asap pada "
             f"{self.t1.describe()} frame terakhir (api {local.fire_score:.2f}, ambang {s.fire_trigger:.2f}; "
-            f"asap {local.smoke_score:.2f}, ambang {s.smoke_trigger:.2f}) dan verifikasi LLM tidak tersedia."
+            f"asap {local.smoke_score:.2f}, ambang {s.smoke_trigger:.2f}) dan verifikasi AI tidak tersedia."
         )
 
 

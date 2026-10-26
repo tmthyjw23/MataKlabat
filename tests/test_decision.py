@@ -70,7 +70,7 @@ def test_r6_steps_down_after_clear_steps(engine):
     assert all(d.level == Level.WASPADA and d.sub_status == "unverified" for d in held)
     assert "1/4 langkah bersih" in held[0].explanation
     assert dropped.level == Level.AMAN and dropped.changed and dropped.sub_status is None
-    assert "Turun dari WASPADA ke AMAN" in dropped.explanation
+    assert "Turun dari Perlu Dicek ke Normal" in dropped.explanation
     assert rules[6:] == ["R0"] * 4
 
 
@@ -163,7 +163,7 @@ def test_r1_confirmation_window_slides(engine):
 def test_r2_confidence_between_warn_and_danger(engine):
     d = step(engine, v(0.55))
     assert (d.level, d.rule) == (Level.WASPADA, "R2")
-    assert "di bawah ambang BAHAYA 0.70" in d.explanation
+    assert "di bawah ambang kebakaran 0.70" in d.explanation
 
 
 def test_positive_below_conf_warn_is_not_evidence(engine):
@@ -236,7 +236,7 @@ def test_steps_without_verdict_keep_last_rule(engine):
     step(engine, v(0.92))
     d = step(engine, None, scores=HIT)
     assert (d.level, d.rule) == (Level.BAHAYA, "R1")
-    assert d.explanation.startswith("Masih berlaku: BAHAYA")
+    assert d.explanation.startswith("Masih berlaku: Kebakaran Terdeteksi")
 
 
 def test_r6_with_llm_counts_clean_verdicts_only(engine):
@@ -248,7 +248,7 @@ def test_r6_with_llm_counts_clean_verdicts_only(engine):
     assert engine.level == Level.BAHAYA
     d = step(engine, CLEAN_V)
     assert (d.level, d.rule) == (Level.WASPADA, "R6")
-    assert "4 verdict LLM bersih" in d.explanation
+    assert "4 verifikasi AI bersih" in d.explanation
 
 
 def test_failed_verdict_is_ignored(engine):

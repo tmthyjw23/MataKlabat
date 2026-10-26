@@ -6,12 +6,14 @@ import logging
 import threading
 from typing import Any
 
+from mataklabat.alerts import AlertService
 from mataklabat.config import Settings, now_local
+from mataklabat.notifier import OutboxSender, TelegramClient
 from mataklabat.pipeline import ConsoleSink, Monitor
 from mataklabat.recorder import Recorder
 from mataklabat.risk import RiskService
 from mataklabat.snapshots import SnapshotStore
-from mataklabat.storage import Storage
+from mataklabat.storage import Storage, risk_to_dict
 
 log = logging.getLogger(__name__)
 
@@ -106,14 +108,21 @@ def build_monitor(settings: Settings, with_weather: bool = True) -> Monitor:
     storage = Storage(settings.db_path)
     snapshots = SnapshotStore(settings.snapshot_dir, settings.snapshot_archive_max_mb)
 
-    listeners: list[Any] = []
-    services: list[Any] = []
-    # Alerts and the incident agent hook in here (T10, T11).
+    risk = RiskService(*settings.risk_point, listeners=[storage.save_risk]) if with_weather else None
 
-    recorder = Recorder(storage, snapshots, settings.cameras, listeners=listeners)
-    risk = None
-    if with_weather:
-        risk = RiskService(*settings.risk_point, listeners=[storage.save_risk])
+    def risk_provider() -> dict | None:
+        snap = risk.current() if risk is not None else None
+        return None if snap is None else risk_to_dict(snap)
+
+    alerts = AlertService(settings, storage, risk_provider=risk_provider)
+    if risk is not None:
+        risk.listeners.append(alerts.on_risk)
+    telegram = None
+    if settings.telegram_bot_token and settings.telegram_chat_id:
+        telegram = TelegramClient(settings.telegram_bot_token, settings.telegram_chat_id)
+    services: list[Any] = [alerts, OutboxSender(storage, telegram)]
+
+    recorder = Recorder(storage, snapshots, settings.cameras, listeners=[alerts])
     monitor_ref: dict[str, Any] = {}
     services.append(Housekeeper(settings, storage, snapshots, monitor_ref, risk))
     monitor = Monitor(settings, sinks=[ConsoleSink(), recorder], risk=risk, services=services)

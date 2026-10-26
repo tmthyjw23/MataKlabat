@@ -105,9 +105,9 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 ### T10: Pesan, kebijakan alert, outbox Telegram (Spec §8)
 **Description:** `messages.py`, `alerts.py`, `notifier.py` (`TelegramClient`, `OutboxSender`).
 **Acceptance criteria:**
-- [ ] Kebijakan bertingkat + cooldown + ringkasan pagi + risiko naik
-- [ ] Caption ≤ 1.024 karakter; retry/backoff; 429; mode kering
-- [ ] Token tidak pernah muncul di log/DB
+- [x] Kebijakan bertingkat + cooldown + ringkasan pagi + risiko naik
+- [x] Caption ≤ 1.024 karakter; retry/backoff; 429; mode kering
+- [x] Token tidak pernah muncul di log/DB
 **Verification:** `pytest tests/test_messages.py tests/test_alerts.py tests/test_notifier.py -q`
 
 ### T11: AI Agent + tools (Spec §9)

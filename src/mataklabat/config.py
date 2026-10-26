@@ -93,7 +93,7 @@ class Settings:
     # Notifications and optional integrations
     telegram_bot_token: str | None = field(default=None, repr=False)
     telegram_chat_id: str | None = None
-    auto_send_alert: bool = False
+    auto_send_alert: bool = True
     firms_map_key: str | None = field(default=None, repr=False)
     yolo_weights: Path | None = None
     timezone: str = TIMEZONE
@@ -202,7 +202,7 @@ def load_settings(
         prompt_version=prompt_version,
         telegram_bot_token=_env_str("TELEGRAM_BOT_TOKEN"),
         telegram_chat_id=_env_str("TELEGRAM_CHAT_ID"),
-        auto_send_alert=(_env_str("AUTO_SEND_ALERT") or "false").lower() in _TRUE_VALUES,
+        auto_send_alert=(_env_str("AUTO_SEND_ALERT") or "true").lower() in _TRUE_VALUES,
         firms_map_key=_env_str("FIRMS_MAP_KEY"),
         morning_summary_at=_morning_summary(),
         public_url=_env_str("PUBLIC_URL"),

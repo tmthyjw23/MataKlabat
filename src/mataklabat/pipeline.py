@@ -88,15 +88,15 @@ class ConsoleSink:
         if decision.changed:
             log.warning(
                 "%s %s -> %s [%s] %s",
-                cam, decision.level_from, decision.level, decision.rule, decision.explanation,
+                cam, decision.level_from.label, decision.level.label, decision.rule, decision.explanation,
             )
         now = time.monotonic()
         if decision.changed or now - self._last_print.get(cam, 0.0) >= self.interval_s:
             self._last_print[cam] = now
             sub = f" ({decision.sub_status})" if decision.sub_status else ""
             log.info(
-                "%s %-7s%s api=%.2f asap=%.2f T1=%s rule=%s",
-                cam, decision.level, sub, local.fire_score, local.smoke_score,
+                "%s %-20s%s api=%.2f asap=%.2f T1=%s rule=%s",
+                cam, decision.level.label, sub, local.fire_score, local.smoke_score,
                 decision.trace["inputs"]["local"]["t1_hits"], decision.rule,
             )
 

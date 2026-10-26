@@ -281,8 +281,9 @@ class Storage:
         incident_id: int | None = None,
         photo_path: str | None = None,
         status: str = OUTBOX_PENDING,
+        created: datetime | None = None,
     ) -> int:
-        now = iso()
+        now = iso(created)
         with self._tx() as c:
             cur = c.execute(
                 "INSERT INTO outbox (kind, camera_id, incident_id, text, photo_path, status, next_attempt_ts,"
@@ -317,6 +318,22 @@ class Storage:
         with self._tx() as c:
             row = c.execute("SELECT * FROM outbox WHERE id=?", (outbox_id,)).fetchone()
         return None if row is None else dict(row)
+
+    def outbox_count_since(self, kind: str, since: datetime) -> int:
+        with self._tx() as c:
+            row = c.execute(
+                "SELECT COUNT(*) AS n FROM outbox WHERE kind=? AND created_ts>=?", (kind, iso(since))
+            ).fetchone()
+        return int(row["n"])
+
+    def current_risk_level(self) -> str | None:
+        with self._tx() as c:
+            row = c.execute("SELECT json FROM risk_current WHERE id=1").fetchone()
+        return None if row is None else json.loads(row["json"]).get("level")
+
+    def camera_rows(self) -> list[dict[str, Any]]:
+        with self._tx() as c:
+            return [dict(r) for r in c.execute("SELECT * FROM camera_status ORDER BY camera_id").fetchall()]
 
     # --- health and retention -------------------------------------------------------------
 

@@ -116,7 +116,7 @@ def test_console_sink_logs_level_change(tmp_path, caplog):
     with caplog.at_level(logging.INFO, logger="mataklabat.pipeline"):
         worker.start()
         try:
-            assert wait_for(lambda: "AMAN -> WASPADA" in caplog.text)
+            assert wait_for(lambda: "Normal -> Perlu Dicek" in caplog.text)
         finally:
             stop.set()
             worker.join(3)
