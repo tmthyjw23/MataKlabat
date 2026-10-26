@@ -12,6 +12,7 @@ import requests
 
 from mataklabat.camera import CameraSource
 from mataklabat.config import PROMPT_VERSIONS, TIMEZONE, ConfigError, Settings, load_settings
+from mataklabat.pipeline import Monitor
 
 log = logging.getLogger("mataklabat")
 
@@ -28,6 +29,9 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--camera", metavar="ID", help="Hanya jalankan satu kamera, misalnya CAM-01.")
     run.add_argument("--no-llm", action="store_true", help="Hanya detektor lokal, tanpa Gemini.")
     run.add_argument("--prompt", choices=PROMPT_VERSIONS, help="Versi prompt verifikasi Gemini.")
+    run.add_argument(
+        "--duration", type=float, metavar="DETIK", help="Berhenti otomatis setelah sekian detik."
+    )
 
     sub.add_parser("check", help="Cek konfigurasi, kamera, API key Gemini, dan koneksi cuaca.")
     return parser
@@ -47,8 +51,9 @@ def cmd_run(settings: Settings, args: argparse.Namespace) -> int:
     print(f"MataKlabat: {len(settings.cameras)} kamera, {mode}.")
     for cam in settings.cameras:
         print(f"  {cam.id}  {cam.name}  (sumber: {cam.source})")
-    # TODO(T4): start one CameraWorker per camera here.
-    print("Pipeline pemantauan belum tersedia (dikerjakan di T4).")
+    if settings.llm_enabled:
+        print("Catatan: verifikasi Gemini belum tersambung (T5), keputusan memakai detektor lokal.")
+    Monitor(settings).run_forever(duration_s=args.duration)
     return 0
 
 

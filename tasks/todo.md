@@ -43,9 +43,9 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 ### T4: Pipeline headless + Decision Engine versi lokal
 **Description:** `CameraWorker` per kamera (thread): ambil frame, deteksi, lalu `DecisionEngine` (sementara hanya R4/R6/R0, karena LLM belum ada), lalu log ke console. `run --no-llm` menjalankan semua kamera.
 **Acceptance criteria:**
-- [ ] Console menampilkan per kamera: level, fire/smoke score, tiap ~1 dtk
-- [ ] Video api di HP di depan webcam memicu **WASPADA (unverified)**, dan kembali AMAN setelah dijauhkan (R6)
-- [ ] Ctrl+C menghentikan semua thread dengan bersih
+- [x] Console menampilkan per kamera: level, fire/smoke score, tiap ~1 dtk
+- [ ] Video api di HP di depan webcam memicu **WASPADA (unverified)**, dan kembali AMAN setelah dijauhkan (R6) *(sudah lulus dengan video sintetis di `tests/test_pipeline.py`; uji HP manual belum)*
+- [x] Ctrl+C menghentikan semua thread dengan bersih
 
 **Verification:** manual + `pytest tests/test_decision.py -q` (R4, R6, R0)
 **Dependencies:** T2, T3 · **Files:** `pipeline.py`, `decision.py`, `tests/test_decision.py` · **Scope:** M

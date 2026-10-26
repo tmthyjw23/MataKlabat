@@ -413,4 +413,7 @@ reference_points:
 | 2026-10-26 | Nama env konstanta = nama field `Settings` huruf besar; trigger §4.3 memakai `FIRE_TRIGGER`, `SMOKE_TRIGGER`, `TRIGGER_WINDOW`, `TRIGGER_MIN_HITS`, dan `CONF_SINGLE_CONFIRM` (0.90) untuk konfirmasi 1 verdict | Dokumen belum memberi nama untuk konstanta ini. Satu aturan penamaan untuk semua override |
 | 2026-10-26 | Nilai env berawalan `isi_` dianggap kosong | `.env` yang disalin mentah dari `.env.example` tidak boleh dianggap API key sungguhan |
 | 2026-10-26 | `boxes` diambil dari `connectedComponentsWithStats`, bukan `findContours`; luas = jumlah piksel komponen; mask gerak di-dilate 5×5 sebanyak 2 iterasi | `findContours` + `contourArea` turun ke 12 FPS pada frame bising (noise sensor malam). Connected components tetap ≥ 30 FPS di kasus terburuk |
+| 2026-10-26 | R6 juga dipakai untuk langkah "menahan level": selama level > AMAN dan tidak ada bukti, R6 menghitung langkah bersih (`clear: n/4` di trace) dan baru menurunkan level saat hitungan penuh. Bukti baru mereset hitungan. Rule bukti (R4, nanti R1–R3) tidak pernah menurunkan level | §6.3 tidak menyebut rule untuk langkah tunggu; memakai R6 menghindari rule baru dan tetap jujur di trace |
+| 2026-10-26 | Satu langkah = satu frame yang diproses (`PROCESS_FPS`). Mode tanpa LLM: langkah bersih = T1 tidak aktif | Dengan PROCESS_FPS=2 dan CLEAR_STEPS=4, turun 1 level butuh ±2 dtk setelah T1 padam |
+| 2026-10-26 | `run --duration DETIK` | Untuk uji stabilitas Checkpoint A dan verifikasi otomatis tanpa Ctrl+C |
 | | *(agent menambahkan baris di sini)* | |
