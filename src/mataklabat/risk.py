@@ -181,8 +181,10 @@ class RiskService:
         refresh_s: float = REFRESH_S,
         retry_s: float = RETRY_S,
         stale_after_s: float = STALE_AFTER_S,
+        listeners: list[Callable[[RiskSnapshot], None]] | None = None,
     ):
         self.lat, self.lon = lat, lon
+        self.listeners = listeners if listeners is not None else []
         self._fetch = fetch
         self._clock = clock
         self.refresh_s = refresh_s
@@ -204,6 +206,11 @@ class RiskService:
         with self._lock:
             self._snapshot = snapshot
         self.last_error = None
+        for listener in self.listeners:
+            try:
+                listener(snapshot)
+            except Exception:
+                log.exception("Listener risiko gagal.")
         log.info(
             "Risiko kawasan: %s (karena %s), FWI %.1f, %d hari tanpa hujan.",
             snapshot.level, snapshot.driver_text, snapshot.fwi, snapshot.days_without_rain,

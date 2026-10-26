@@ -12,11 +12,11 @@ from pathlib import Path
 
 import requests
 
-from mataklabat.camera import CameraSource
+from mataklabat.camera import open_source
 from mataklabat.config import PROMPT_VERSIONS, TIMEZONE, ConfigError, Settings, load_settings, now_local
-from mataklabat.pipeline import Monitor
+from mataklabat.logs import setup_logging
+from mataklabat.monitor import build_monitor
 from mataklabat.prompts import PromptContext
-from mataklabat.risk import RiskService
 from mataklabat.vision_llm import VisionVerifier
 
 log = logging.getLogger("mataklabat")
@@ -61,7 +61,8 @@ def cmd_run(settings: Settings, args: argparse.Namespace) -> int:
     print(f"MataKlabat: {len(settings.cameras)} kamera, {mode}.")
     for cam in settings.cameras:
         print(f"  {cam.id}  {cam.name}  (sumber: {cam.source})")
-    Monitor(settings, risk=RiskService(*settings.risk_point)).run_forever(duration_s=args.duration)
+    setup_logging(settings, "monitor", args.verbose)
+    build_monitor(settings).run_forever(duration_s=args.duration)
     return 0
 
 
@@ -74,7 +75,7 @@ TELEGRAM_API = "https://api.telegram.org"
 
 def check_cameras(settings: Settings, wait_s: float = 6.0) -> list[CheckRow]:
     """Open every camera at the same time and wait for a first frame from each."""
-    sources = [CameraSource(cam).start() for cam in settings.cameras]
+    sources = [open_source(cam).start() for cam in settings.cameras]
     try:
         deadline = time.monotonic() + wait_s
         while time.monotonic() < deadline and not all(s.online for s in sources):
@@ -185,11 +186,7 @@ def main(argv: list[str] | None = None) -> int:
             stream.reconfigure(encoding="utf-8", errors="replace")
 
     args = build_parser().parse_args(argv)
-    logging.basicConfig(
-        level=logging.DEBUG if args.verbose else logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
+    setup_logging(None, args.command, args.verbose)
     try:
         settings = load_settings()
         if args.command == "run":

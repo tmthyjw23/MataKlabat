@@ -238,7 +238,11 @@ class CameraWorker(threading.Thread):
 
 
 class Monitor:
-    """Starts every camera worker and stops them all cleanly on Ctrl+C."""
+    """Starts every camera worker and stops them all cleanly on Ctrl+C.
+
+    `services` are background helpers with start()/stop() (risk refresh, outbox
+    sender, housekeeping); they start before the cameras and stop after them.
+    """
 
     def __init__(
         self,
@@ -246,13 +250,16 @@ class Monitor:
         sinks: list[DecisionSink] | None = None,
         verifier: VisionVerifier | None = None,
         risk: RiskService | None = None,
+        services: list | None = None,
     ):
         self.settings = settings
         self.risk = risk
+        self.services = ([risk] if risk is not None else []) + list(services or [])
         self.stop_event = threading.Event()
         self.sinks = sinks if sinks is not None else [ConsoleSink()]
         if settings.llm_enabled and verifier is None:
             verifier = VisionVerifier(settings)
+        self.verifier = verifier
         scheduler = LLMScheduler(verifier.limiter) if verifier is not None else None
         self.workers = [
             CameraWorker(
@@ -263,21 +270,24 @@ class Monitor:
         ]
 
     def start(self) -> None:
-        if self.risk is not None:
-            self.risk.start()
+        for service in self.services:
+            service.start()
         for worker in self.workers:
             worker.start()
 
     def stop(self, timeout: float = 5.0) -> None:
         self.stop_event.set()
-        if self.risk is not None:
-            self.risk.stop()
         deadline = time.monotonic() + timeout
         for worker in self.workers:
             worker.join(max(0.0, deadline - time.monotonic()))
         alive = [w.camera.id for w in self.workers if w.is_alive()]
         if alive:
             log.warning("Worker belum berhenti: %s", ", ".join(alive))
+        for service in reversed(self.services):
+            try:
+                service.stop()
+            except Exception:
+                log.exception("Gagal menghentikan %s.", type(service).__name__)
 
     def run_forever(self, duration_s: float | None = None) -> None:
         """Block until Ctrl+C, or until `duration_s` seconds have passed."""

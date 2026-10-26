@@ -97,6 +97,9 @@ class Settings:
     firms_map_key: str | None = field(default=None, repr=False)
     yolo_weights: Path | None = None
     timezone: str = TIMEZONE
+    morning_summary_at: str = "07:00"  # HH:MM WITA, empty = off
+    public_url: str | None = None  # link added to Telegram messages when set
+    web_host: str = "127.0.0.1"
 
     # Pipeline pacing
     process_fps: float = 2.0
@@ -123,6 +126,14 @@ class Settings:
     confirm_min: int = 2
     clear_steps: int = 4
     agent_cooldown_s: float = 600.0
+
+    # Spec §8, §10-12: alerts, web, retention
+    check_alert_cooldown_s: float = 900.0
+    agent_timeout_s: float = 60.0
+    agent_max_steps: int = 6
+    web_port: int = 8000
+    event_keep_days: int = 7
+    snapshot_archive_max_mb: float = 500.0
 
     @property
     def runtime_dir(self) -> Path:
@@ -193,11 +204,25 @@ def load_settings(
         telegram_chat_id=_env_str("TELEGRAM_CHAT_ID"),
         auto_send_alert=(_env_str("AUTO_SEND_ALERT") or "false").lower() in _TRUE_VALUES,
         firms_map_key=_env_str("FIRMS_MAP_KEY"),
+        morning_summary_at=_morning_summary(),
+        public_url=_env_str("PUBLIC_URL"),
+        web_host=_env_str("WEB_HOST") or "127.0.0.1",
         yolo_weights=Path(yolo) if yolo else None,
         **_numeric_overrides(),
     )
     _validate(settings)
     return settings
+
+
+def _morning_summary() -> str:
+    raw = os.getenv("MORNING_SUMMARY_AT", "07:00").strip()
+    if raw == "":
+        return ""
+    try:
+        datetime.strptime(raw, "%H:%M")
+    except ValueError:
+        raise ConfigError(f"MORNING_SUMMARY_AT={raw!r} harus berformat HH:MM atau kosong.") from None
+    return raw
 
 
 def _env_str(name: str) -> str | None:

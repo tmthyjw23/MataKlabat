@@ -97,9 +97,9 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 ### T9: Storage, snapshot, kesehatan (Spec §11–12)
 **Description:** `storage.py` (skema Spec §11, WAL, retensi), `snapshots.py` (latest + arsip + bbox), insiden buka/tutup, `component_health` + heartbeat monitor, log file berotasi.
 **Acceptance criteria:**
-- [ ] BAHAYA membuka insiden; kembali AMAN menutupnya
-- [ ] DB bisa dibaca proses lain saat monitor menulis
-- [ ] Retensi menghapus event > 7 hari
+- [x] BAHAYA membuka insiden; kembali AMAN menutupnya
+- [x] DB bisa dibaca proses lain saat monitor menulis
+- [x] Retensi menghapus event > 7 hari
 **Verification:** `pytest tests/test_storage.py -q`
 
 ### T10: Pesan, kebijakan alert, outbox Telegram (Spec §8)
