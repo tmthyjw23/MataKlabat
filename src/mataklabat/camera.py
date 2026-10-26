@@ -212,7 +212,7 @@ class FolderSource(FrameSource):
             return
         path, photo_id = newest
         if photo_id != self._current_id:
-            image = _read_image(path)
+            image = read_image(path)
             if image is None:
                 # Probably still being copied; try again on the next scan.
                 log.debug("Kamera %s: %s belum bisa dibaca.", self.camera.id, path.name)
@@ -247,7 +247,7 @@ class FolderSource(FrameSource):
             self._stop.wait(self.scan_s)
 
 
-def _read_image(path: Path) -> np.ndarray | None:
+def read_image(path: Path) -> np.ndarray | None:
     # np.fromfile + imdecode also works for non-ASCII paths on Windows, unlike cv2.imread.
     try:
         data = np.fromfile(str(path), dtype=np.uint8)
