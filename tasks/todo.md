@@ -138,8 +138,8 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 
 ### T15: Dokumen & kesiapan demo
 **Acceptance criteria:**
-- [ ] PRD, ARCHITECTURE, AGENTS, README sesuai Spec; `docs/DEMO.md` berisi checklist Spec §16
-- [ ] Clone bersih + Quick Start berjalan; tidak ada secret di git
+- [x] PRD, ARCHITECTURE, AGENTS, README sesuai Spec; `docs/DEMO.md` berisi checklist Spec §16
+- [x] Clone bersih + Quick Start berjalan; tidak ada secret di git
 
 ## ✅ Checkpoint Akhir
-- [ ] `pytest -q` hijau · [ ] `run --no-llm` dan `up` berjalan · [ ] Uji nyata 9router + Telegram (butuh `.env`) · [ ] Push ke GitHub (oleh pemilik)
+- [x] `pytest -q` hijau (239) · [x] `run --no-llm` dan `up` berjalan · [ ] Uji nyata 9router + Telegram (butuh `.env`) · [ ] Test set + evaluasi T14 (butuh foto) · [ ] Push ke GitHub (oleh pemilik)
