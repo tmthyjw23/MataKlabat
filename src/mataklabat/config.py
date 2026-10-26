@@ -23,6 +23,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_LLM_BASE_URL = "http://localhost:20128/v1"  # 9router, OpenAI-compatible
 TIMEZONE = "Asia/Makassar"
 PROMPT_VERSIONS = ("v1", "v2")
+MODE_LIVE = "live"
+MODE_PHOTO = "foto"
 
 _PLACEHOLDER_PREFIX = "isi_"  # values copied unchanged from .env.example
 _TRUE_VALUES = {"1", "true", "yes", "ya", "on"}
@@ -41,10 +43,15 @@ class ConfigError(ValueError):
 class CameraConfig:
     id: str
     name: str
-    source: int | str  # webcam index, video path, or stream URL
+    source: int | str  # webcam index, video path, stream URL, or photo folder
     lat: float
     lon: float
     facing_deg: float = 0.0
+    mode: str = "live"  # "live" (webcam/video/stream) or "foto" (newest photo in a folder)
+
+    @property
+    def is_photo(self) -> bool:
+        return self.mode == MODE_PHOTO
 
 
 @dataclass(frozen=True)
@@ -295,14 +302,21 @@ def _load_cameras(path: Path, root: Path) -> tuple[CameraConfig, ...]:
         seen.add(cam_id)
         where = f"{path.name} kamera {cam_id}"
         facing = item.get("facing_deg", 0.0)
+        mode = str(item.get("mode", MODE_LIVE)).strip().lower()
+        if mode not in (MODE_LIVE, MODE_PHOTO):
+            raise ConfigError(f"{where}: 'mode' harus '{MODE_LIVE}' atau '{MODE_PHOTO}', bukan {mode!r}.")
+        source = _parse_source(item["source"], root, where)
+        if mode == MODE_PHOTO and not isinstance(source, str):
+            raise ConfigError(f"{where}: kamera mode foto butuh 'source' berupa path folder.")
         cameras.append(
             CameraConfig(
                 id=cam_id,
                 name=str(item["name"]),
-                source=_parse_source(item["source"], root, where),
+                source=source,
                 lat=_number(item, "lat", where, -90, 90),
                 lon=_number(item, "lon", where, -180, 180),
                 facing_deg=_number({"facing_deg": facing}, "facing_deg", where, 0, 360) % 360,
+                mode=mode,
             )
         )
     return tuple(cameras)

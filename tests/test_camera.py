@@ -140,3 +140,73 @@ def test_check_telegram_hides_token_on_error(monkeypatch, tmp_path):
     )
     name, ok, detail = cli.check_telegram(settings)
     assert ok is False and "SECRET" not in detail
+
+
+# --- photo cameras (Spec §5.2) ------------------------------------------------------
+
+import os  # noqa: E402
+
+from mataklabat.camera import FolderSource, open_source  # noqa: E402
+
+
+def photo_camera(folder) -> CameraConfig:
+    return CameraConfig(id="CAM-F", name="Foto", source=str(folder), lat=1.4, lon=125.0, mode="foto")
+
+
+def write_photo(path: Path, value: int, mtime_offset: float = 0.0) -> Path:
+    ok, buf = cv2.imencode(path.suffix, np.full((40, 60, 3), value, dtype=np.uint8))
+    assert ok
+    path.write_bytes(buf.tobytes())
+    t = time.time() + mtime_offset
+    os.utime(path, (t, t))
+    return path
+
+
+def test_open_source_picks_folder_source(tmp_path):
+    assert isinstance(open_source(photo_camera(tmp_path)), FolderSource)
+    assert isinstance(open_source(camera(0)), CameraSource)
+
+
+def test_folder_source_shows_newest_photo(tmp_path):
+    write_photo(tmp_path / "a.jpg", 10, mtime_offset=-10)
+    write_photo(tmp_path / "b.png", 200)
+    (tmp_path / "notes.txt").write_text("bukan foto")
+    src = FolderSource(photo_camera(tmp_path))
+    src.scan_once()
+    frame = src.latest()
+    assert frame.still_id.startswith("b.png@")
+    assert frame.image.mean() > 150
+    src.scan_once()  # same photo is re-published so the camera stays online
+    again = src.latest()
+    assert again.seq == frame.seq + 1 and again.still_id == frame.still_id
+
+
+def test_folder_source_picks_up_new_photo_quickly(tmp_path):
+    write_photo(tmp_path / "first.jpg", 10, mtime_offset=-10)
+    with FolderSource(photo_camera(tmp_path), scan_s=0.1) as src:
+        assert wait_for(lambda: src.latest() is not None)
+        first = src.latest().still_id
+        write_photo(tmp_path / "asap ñ.jpg", 120)  # non-ASCII name
+        assert wait_for(lambda: src.latest().still_id != first, timeout=2.0)
+        assert src.latest().still_id.startswith("asap ñ.jpg@")
+
+
+def test_folder_source_ignores_unreadable_new_file(tmp_path):
+    write_photo(tmp_path / "ok.jpg", 50, mtime_offset=-10)
+    src = FolderSource(photo_camera(tmp_path))
+    src.scan_once()
+    good = src.latest().still_id
+    (tmp_path / "copying.jpg").write_bytes(b"\xff\xd8 not finished")
+    src.scan_once()
+    assert src.latest().still_id == good  # keeps showing the last good photo
+
+
+@pytest.mark.parametrize(("make_folder", "message"), [(True, "belum berisi foto"), (False, "tidak ditemukan")])
+def test_folder_source_offline_with_clear_message(tmp_path, make_folder, message):
+    folder = tmp_path / "CAM-F"
+    if make_folder:
+        folder.mkdir()
+    src = FolderSource(photo_camera(folder))
+    src.scan_once()
+    assert src.latest() is None and not src.online
+    assert message in src.last_error

@@ -90,8 +90,8 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 ### T8: Kamera Foto (Spec §5.2)
 **Description:** `FolderSource`: foto terbaru di folder, `mode: foto` di `cameras.yaml`, detektor tanpa gerak, foto baru memicu LLM sekali.
 **Acceptance criteria:**
-- [ ] Menyalin foto baru ke folder → frame baru ≤ 2 dtk
-- [ ] Folder kosong → offline dengan pesan jelas
+- [x] Menyalin foto baru ke folder → frame baru ≤ 2 dtk
+- [x] Folder kosong → offline dengan pesan jelas
 **Verification:** `pytest tests/test_camera.py tests/test_pipeline.py -q`
 
 ### T9: Storage, snapshot, kesehatan (Spec §11–12)

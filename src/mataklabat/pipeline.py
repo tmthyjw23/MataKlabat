@@ -8,7 +8,7 @@ import time
 from enum import IntEnum
 from typing import Callable, Protocol
 
-from mataklabat.camera import CameraSource, Frame
+from mataklabat.camera import Frame, open_source
 from mataklabat.config import CameraConfig, Settings
 from mataklabat.decision import Decision, DecisionEngine, Level
 from mataklabat.detector import Detector, LocalDetection, create_detector
@@ -113,7 +113,7 @@ class CameraWorker(threading.Thread):
         settings: Settings,
         sinks: list[DecisionSink],
         stop_event: threading.Event,
-        detector_factory: Callable[[Settings], Detector] = create_detector,
+        detector_factory: Callable[..., Detector] = create_detector,
         verifier: VisionVerifier | None = None,
         scheduler: LLMScheduler | None = None,
         clock: Callable[[], float] = time.monotonic,
@@ -124,8 +124,8 @@ class CameraWorker(threading.Thread):
         self.settings = settings
         self.sinks = sinks
         self.stop_event = stop_event
-        self.source = CameraSource(camera)
-        self.detector = detector_factory(settings)
+        self.source = open_source(camera)
+        self.detector = detector_factory(settings, camera)
         self.engine = DecisionEngine(camera.id, settings)
         self.verifier = verifier if settings.llm_enabled else None
         self.scheduler = scheduler
@@ -133,6 +133,7 @@ class CameraWorker(threading.Thread):
         self._clock = clock
         self._last_llm_at: float | None = None
         self._llm_failed = False
+        self._last_still_checked: str | None = None
         self.last_decision: Decision | None = None
 
     @property
@@ -186,14 +187,19 @@ class CameraWorker(threading.Thread):
                 log.exception("%s: sink %s gagal.", self.camera.id, type(sink).__name__)
         return decision
 
-    def due_trigger(self) -> Trigger | None:
-        """Highest-priority trigger that is due for this camera (§4.3)."""
+    def due_trigger(self, frame: Frame | None = None) -> Trigger | None:
+        """Highest-priority trigger that is due for this camera (§4.3).
+
+        On a photo camera a photo that has not been checked yet counts as T1 right away
+        (Spec §5.2), without waiting for RECHECK_S.
+        """
         s = self.settings
+        new_photo = frame is not None and frame.still_id is not None and frame.still_id != self._last_still_checked
         since = None if self._last_llm_at is None else self._clock() - self._last_llm_at
         recheck_due = since is None or since >= s.recheck_s
         if self.engine.level != Level.AMAN and recheck_due:
             return Trigger.T2
-        if self.engine.t1.active and recheck_due:
+        if new_photo or (self.engine.t1.active and recheck_due):
             return Trigger.T1
         if s.heartbeat_s > 0 and (since is None or since >= s.heartbeat_s):
             return Trigger.T3
@@ -202,12 +208,14 @@ class CameraWorker(threading.Thread):
     def _maybe_verify(self, frame: Frame, local: LocalDetection, snapshot=None):
         if self.verifier is None or self.scheduler is None:
             return None
-        trigger = self.due_trigger()
+        trigger = self.due_trigger(frame)
         if trigger is None:
             self.scheduler.withdraw(self.camera.id)
             return None
         if not self.scheduler.request(self.camera.id, trigger):
             return None
+        if frame.still_id is not None:
+            self._last_still_checked = frame.still_id
         ctx = PromptContext(
             camera_name=self.camera.name,
             facing_deg=self.camera.facing_deg,

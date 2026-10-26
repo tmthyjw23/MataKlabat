@@ -187,3 +187,31 @@ def test_module_entry_point_help():
     )
     assert result.returncode == 0, result.stderr
     assert "run" in result.stdout and "check" in result.stdout
+
+
+def test_photo_camera_mode(tmp_path):
+    cams = VALID_CAMERAS + '  - {id: CAM-03, name: "Foto", source: "data/demo/CAM-03", lat: 1.4, lon: 125.0, mode: foto}\n'
+    s = load_settings(make_root(tmp_path, cameras=cams))
+    cam = s.camera("CAM-03")
+    assert cam.is_photo and cam.source == str(tmp_path / "data/demo/CAM-03")
+    assert not s.camera("CAM-01").is_photo
+
+
+@pytest.mark.parametrize(
+    ("line", "fragment"),
+    [
+        ('{id: X, name: A, source: "d", lat: 1, lon: 2, mode: slideshow}', "mode"),
+        ("{id: X, name: A, source: 0, lat: 1, lon: 2, mode: foto}", "folder"),
+    ],
+)
+def test_invalid_photo_mode(tmp_path, line, fragment):
+    with pytest.raises(ConfigError, match=fragment):
+        load_settings(make_root(tmp_path, cameras=f"cameras:\n  - {line}\n"))
+
+
+def test_risk_point_prefers_reference_point(tmp_path):
+    assert load_settings(make_root(tmp_path)).risk_point == (1.4667, 125.0333)
+
+
+def test_risk_point_falls_back_to_first_camera(tmp_path):
+    assert load_settings(make_root(tmp_path, resources=None)).risk_point == (1.42, 124.98)

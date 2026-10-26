@@ -8,3 +8,7 @@ data/videos/*.mp4
 results/*.png
 .DS_Store
 *.egg-info/
+data/demo/**/*.jpg
+data/demo/**/*.jpeg
+data/demo/**/*.png
+data/demo/**/*.webp

@@ -250,3 +250,29 @@ def test_worker_falls_back_to_r4_when_llm_fails(tmp_path):
     )
     r4 = next(d for d in decisions if d.rule == "R4")
     assert r4.level == Level.WASPADA and r4.sub_status == "unverified"
+
+
+def test_photo_camera_checks_each_new_photo_once(tmp_path):
+    from tests.test_camera import write_photo
+
+    folder = tmp_path / "CAM-F"
+    folder.mkdir()
+    write_photo(folder / "a.jpg", 30, mtime_offset=-10)
+    cam = CameraConfig("CAM-F", "Foto", str(folder), 1.4, 125.0, mode="foto")
+    verifier = FakeVerifier(LLMVerdict(hazard_type="none", confidence=0.9, prompt_version="v2"))
+    sink, stop = RecordingSink(), threading.Event()
+    worker = CameraWorker(
+        cam, llm_settings(tmp_path, cam, heartbeat_s=0, recheck_s=60), [sink], stop,
+        verifier=verifier, scheduler=LLMScheduler(verifier.limiter),
+    )
+    assert worker.detector.use_motion is False
+    worker.start()
+    try:
+        assert wait_for(lambda: verifier.calls == 1)
+        time.sleep(1.5)
+        assert verifier.calls == 1  # same photo: no new check before RECHECK_S
+        write_photo(folder / "b.jpg", 200)
+        assert wait_for(lambda: verifier.calls == 2, timeout=5)
+    finally:
+        stop.set()
+        worker.join(3)

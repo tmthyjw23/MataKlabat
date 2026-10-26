@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 
 from mataklabat.camera import Frame
-from mataklabat.config import Settings
+from mataklabat.config import CameraConfig, Settings
 
 log = logging.getLogger(__name__)
 
@@ -152,11 +152,13 @@ class YoloDetector:
         )
 
 
-def create_detector(settings: Settings) -> Detector:
+def create_detector(settings: Settings, camera: CameraConfig | None = None) -> Detector:
     if settings.yolo_weights is not None:
         log.info("Memakai YoloDetector (%s).", settings.yolo_weights)
         return YoloDetector(settings.yolo_weights)
-    return ColorMotionDetector(settings.fire_gain, settings.smoke_gain)
+    # Photo cameras show still images: there is no motion to gate on, so use color only.
+    use_motion = camera is None or not camera.is_photo
+    return ColorMotionDetector(settings.fire_gain, settings.smoke_gain, use_motion=use_motion)
 
 
 def fire_mask(image: np.ndarray) -> np.ndarray:

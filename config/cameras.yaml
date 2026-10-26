@@ -1,5 +1,6 @@
 # Koordinat PERKIRAAN — verifikasi di Google Maps sebelum demo.
 # facing_deg: arah hadap kamera (0 = utara, 90 = timur).
+# mode: live (webcam/video/stream, default) atau foto (foto terbaru di sebuah folder).
 cameras:
   - id: CAM-01
     name: "Monumen Kaki Dian (Airmadidi)"
@@ -21,7 +22,9 @@ cameras:
     facing_deg: 120
   - id: CAM-04
     name: "Matungkas - Laikit"
-    source: "data/videos/cam04.mp4"
+    # Kamera Foto: menampilkan foto terbaru di folder ini. Saat demo, seret foto ke folder.
+    source: "data/demo/CAM-04"
+    mode: foto
     lat: 1.4750
     lon: 124.9500
     facing_deg: 90
