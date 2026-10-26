@@ -77,92 +77,69 @@ Kerjakan berurutan. Centang `[x]` hanya setelah **Verification** lulus. Rujukan 
 **Verification:** `pytest tests/test_decision.py -q`
 **Dependencies:** T4, T5 · **Files:** `decision.py`, `pipeline.py`, `tests/test_decision.py` · **Scope:** M
 
-### T7: Storage SQLite + snapshot (§9)
-**Description:** `storage.py`: init schema, `insert_event`, `upsert_camera_status`, `open_incident`, `close_incident`, `update_incident_report`, query untuk dashboard. WAL mode. Snapshot `latest.jpg` per kamera, plus arsip saat ≥ WASPADA. Bbox digambar di snapshot.
+> **v2 (26 Okt 2026):** task T7 dan seterusnya disusun ulang mengikuti `docs/superpowers/specs/2026-10-26-mataklabat-v2-design.md` (selanjutnya "Spec"). T1–T6 tetap berlaku.
+
+### T7: Risiko Kawasan: FWI + FDRS (Spec §6)
+**Description:** `fwi.py` (Van Wagner 1987, penyesuaian lintang ekuator seperti `cffdrs`), kelas FDRS Indonesia (de Groot dkk. 2006, tabel 1–3), `risk.py` (Open-Meteo, spin-up, cache, data basi, prakiraan 3 hari). Decision Engine memakai kelas risiko untuk ambang.
 **Acceptance criteria:**
-- [ ] Masuk BAHAYA membuka incident. Turun ke AMAN menutupnya (`closed_ts`)
-- [ ] DB bisa dibaca proses lain saat monitor menulis (uji 2 koneksi)
+- [x] FFMC/DMC/DC/ISI/BUI/FWI cocok dengan nilai referensi Van Wagner & Pickett (±0,1)
+- [x] Kelas FFMC/DC/ISI sesuai tabel FDRS; risiko kawasan = kelas tertinggi + indikator penentunya
+- [x] Open-Meteo gagal → nilai terakhir + label basi; > 6 jam → "tidak diketahui"
+**Verification:** `pytest tests/test_fwi.py tests/test_risk.py -q`
 
-**Verification:** `pytest tests/test_storage.py -q` + manual: `sqlite3 data/runtime/events.db "select level, rule from events order by id desc limit 5"`
-**Dependencies:** T6 · **Files:** `storage.py`, `pipeline.py`, `tests/test_storage.py` · **Scope:** S
-
-## ✅ Checkpoint B
-- [ ] Video api ke webcam: BAHAYA ≤ 30 dtk, dengan trace di DB · [ ] Foto kabut: dicatat (BAHAYA atau tidak, catat untuk analisis F1) · [ ] Commit
-
----
-
-## Fase 3: Risiko + Agent
-
-### T8: RiskService + FRI (§6.1)
-**Description:** Open-Meteo (`current` + `daily precipitation_sum`, `past_days=14`, `timezone=Asia/Makassar`), cache 15 menit, hitung FRI dan kategori. Jika gagal, pakai nilai terakhir atau `None` (ambang default).
+### T8: Kamera Foto (Spec §5.2)
+**Description:** `FolderSource`: foto terbaru di folder, `mode: foto` di `cameras.yaml`, detektor tanpa gerak, foto baru memicu LLM sekali.
 **Acceptance criteria:**
-- [ ] Unit test formula FRI dengan input tetap (contoh: RH 40, T 32, W 20, 10 hari kering memberi nilai yang dihitung manual)
-- [ ] Decision Engine memakai FRI nyata
+- [ ] Menyalin foto baru ke folder → frame baru ≤ 2 dtk
+- [ ] Folder kosong → offline dengan pesan jelas
+**Verification:** `pytest tests/test_camera.py tests/test_pipeline.py -q`
 
-**Verification:** `pytest tests/test_risk.py -q`
-**Dependencies:** T6 · **Files:** `risk.py`, `tests/test_risk.py` · **Scope:** S
-
-### T9: IncidentAgent + tools + notifier (§7)
-**Description:** Tools §7.2 (`estimate_spread` dengan konversi arah angin yang benar), loop tool calling (OpenAI-compatible via 9router) maks 6 langkah dan timeout 60 dtk, laporan markdown disimpan ke `incidents.report_md`, jejak tool ke `agent_steps_json`. `ConsoleNotifier` dan `TelegramNotifier` (mengikuti `AUTO_SEND_ALERT`). Cooldown 10 menit.
+### T9: Storage, snapshot, kesehatan (Spec §11–12)
+**Description:** `storage.py` (skema Spec §11, WAL, retensi), `snapshots.py` (latest + arsip + bbox), insiden buka/tutup, `component_health` + heartbeat monitor, log file berotasi.
 **Acceptance criteria:**
-- [ ] Angin **dari** 270° (barat) memberi sebaran **ke** timur (90°). Ada unit test
-- [ ] Laporan memiliki 6 bagian §7.3 dan label "Dihasilkan AI. Verifikasi lapangan diperlukan."
-- [ ] Tanpa `FIRMS_MAP_KEY`, laporan menulis "tidak tersedia", bukan data karangan
+- [ ] BAHAYA membuka insiden; kembali AMAN menutupnya
+- [ ] DB bisa dibaca proses lain saat monitor menulis
+- [ ] Retensi menghapus event > 7 hari
+**Verification:** `pytest tests/test_storage.py -q`
 
-**Verification:** `pytest tests/test_tools.py tests/test_agent.py -q` (agent dengan mock LLM) + 1 insiden nyata
-**Dependencies:** T7, T8 · **Files:** `tools.py`, `agent.py`, `notifier.py`, tests · **Scope:** M
-
----
-
-## Fase 4: Dashboard
-
-### T10: Dashboard inti (§10)
-**Description:** `app.py`: header status kawasan (level tertinggi semua kamera) + FRI, grid kamera 2×2 dari `latest.jpg` dengan badge warna, peta folium (marker per kamera berwarna, panah arah angin, titik referensi Puncak Klabat), dan panel **"Mengapa?"** untuk kamera terpilih (explanation, reasoning LLM, evidence, JSON trace dalam expander). Refresh 1 dtk via `st.fragment(run_every=1)`.
+### T10: Pesan, kebijakan alert, outbox Telegram (Spec §8)
+**Description:** `messages.py`, `alerts.py`, `notifier.py` (`TelegramClient`, `OutboxSender`).
 **Acceptance criteria:**
-- [ ] Perubahan level di monitor terlihat di dashboard ≤ 2 dtk
-- [ ] Dashboard tidak crash jika DB kosong atau kamera offline (tampil abu-abu)
+- [ ] Kebijakan bertingkat + cooldown + ringkasan pagi + risiko naik
+- [ ] Caption ≤ 1.024 karakter; retry/backoff; 429; mode kering
+- [ ] Token tidak pernah muncul di log/DB
+**Verification:** `pytest tests/test_messages.py tests/test_alerts.py tests/test_notifier.py -q`
 
-**Verification:** manual: jalankan monitor + dashboard, picu api
-**Dependencies:** T7 · **Files:** `app.py`, `src/mataklabat/ui_helpers.py` · **Scope:** M
-
-### T11: Panel insiden & riwayat
-**Description:** Daftar insiden terbuka dan tertutup, render `report_md`, tombol **Kirim ke Telegram** (menandai `alert_sent`), grafik plotly fire/smoke score + level per kamera 30 menit terakhir, tabel event yang bisa difilter.
+### T11: AI Agent + tools (Spec §9)
+**Description:** `tools.py`, `agent.py` (tool calling 9router, maks 6 langkah, 60 dtk), laporan template cadangan.
 **Acceptance criteria:**
-- [ ] Tombol kirim berfungsi (atau menampilkan pesan jelas jika Telegram belum dikonfigurasi)
-- [ ] Grafik menampilkan perubahan level sebagai garis bertingkat
+- [ ] Angin dari 270° → sebaran ke 90°
+- [ ] Laporan 6 bagian + label AI; tanpa FIRMS → "tidak tersedia"
+- [ ] Agent gagal/timeout → laporan template
+**Verification:** `pytest tests/test_tools.py tests/test_agent.py -q`
 
-**Verification:** manual
-**Dependencies:** T9, T10 · **Files:** `app.py` · **Scope:** S
-
-## ✅ Checkpoint C
-- [ ] Jalankan `docs/DEMO.md` menit 2–6 tanpa intervensi kode · [ ] Commit
-
----
-
-## Fase 5: Evaluasi
-
-### T12: `scripts/evaluate.py`
-**Description:** Untuk folder `data/test_set/{fire,smoke,fog,sunset,lights,normal}`: jalankan detektor lokal (gambar statis: pakai 2 salinan dengan jitter kecil agar mask gerak bekerja, atau abaikan gerak dengan flag `--static`), LLM (prompt v1 dan/atau v2), dan keputusan gabungan "satu-shot" (R1 tanpa window). Output `results/predictions.csv` (file, label, scores, verdict, reasoning, benar/salah), `results/metrics.csv` (precision, recall, F1 positif = fire∪smoke, false alarm rate per kelas lookalike), `results/confusion_<variant>.png`, `results/failures.md` (daftar salah klasifikasi + reasoning LLM, dikelompokkan F1–F5). `--repeat N` untuk konsistensi.
+### T12: Website (Spec §10)
+**Description:** `web/app.py` (FastAPI read-only, SSE, header keamanan) + `web/static` (dashboard, insiden, kesehatan, Leaflet 3 lapisan).
 **Acceptance criteria:**
-- [ ] Berjalan pada ≥ 10 gambar per kelas
-- [ ] `failures.md` memuat minimal 1 contoh untuk F1, F2, dan F3 (jika ada)
-- [ ] Tabel perbandingan v1 dan v2 tersedia
+- [ ] Semua endpoint Spec §10.2 teruji; ID kamera tidak valid → 404
+- [ ] Teks LLM tidak pernah dirender sebagai HTML; CSP aktif
+- [ ] Banner "data tidak live" dan "monitor tidak merespons"
+**Verification:** `pytest tests/test_web.py -q` + manual di browser
 
-**Verification:** `python scripts/evaluate.py --set data/test_set --prompt v1,v2 --repeat 3`
-**Dependencies:** T5, T6 · **Files:** `scripts/evaluate.py`, `results/` · **Scope:** M
-
----
-
-## Fase 6: Polish
-
-### T13: README & demo readiness
-**Description:** Screenshot dashboard ke `docs/assets/` dan tautkan di README. Isi tabel hasil evaluasi di README. Uji ulang `DEMO.md` dari awal. Pastikan `.gitignore` benar.
+### T13: Supervisor `up` + skenario demo (Spec §12–13)
 **Acceptance criteria:**
-- [ ] Clone bersih + ikuti Quick Start memberi sistem yang berjalan
-- [ ] Tidak ada secret atau data runtime di git (`git status` bersih, `git log -p | grep -i api_key` kosong)
+- [ ] `up` menjalankan monitor + web, restart saat crash, Ctrl+C bersih
+- [ ] Test skenario: api → Kebakaran Terdeteksi + 2 pesan; kabut → R5 tanpa peringatan; pembakaran sampah → POTENSI
+**Verification:** `pytest tests/test_supervisor.py tests/test_scenarios.py -q`
 
-**Verification:** manual
-**Dependencies:** semua · **Scope:** S
+### T14: `scripts/evaluate.py`
+**Description:** (seperti T12 lama) metrics, confusion, `failures.md`, v1 vs v2, `--repeat`.
+**Verification:** `python scripts/evaluate.py --set data/test_set --prompt v1,v2 --repeat 3` (butuh test set + 9router)
 
-## ✅ Checkpoint D: Selesai
-- [ ] Semua DoD di `AGENTS.md` · [ ] Push ke GitHub
+### T15: Dokumen & kesiapan demo
+**Acceptance criteria:**
+- [ ] PRD, ARCHITECTURE, AGENTS, README sesuai Spec; `docs/DEMO.md` berisi checklist Spec §16
+- [ ] Clone bersih + Quick Start berjalan; tidak ada secret di git
+
+## ✅ Checkpoint Akhir
+- [ ] `pytest -q` hijau · [ ] `run --no-llm` dan `up` berjalan · [ ] Uji nyata 9router + Telegram (butuh `.env`) · [ ] Push ke GitHub (oleh pemilik)

@@ -44,6 +44,7 @@ SUB_UNVERIFIED = "unverified"
 SUB_REJECTED_LOOKALIKE = "rejected_lookalike"
 
 POTENTIAL_RISKS = ("campfire", "people_burning", "trash_burning")
+HIGH_RISK_LEVELS = ("Tinggi", "Sangat Tinggi")  # area risk levels that lower the danger threshold
 
 _RISK_NAMES = {
     "campfire": "api unggun",
@@ -62,13 +63,6 @@ _LOOKALIKE_NAMES = {
 }
 
 
-def fri_category(fri: int | None) -> str | None:
-    """FRI category (§6.1): < 30 RENDAH, 30-59 SEDANG, >= 60 TINGGI."""
-    if fri is None:
-        return None
-    return "RENDAH" if fri < 30 else "SEDANG" if fri < 60 else "TINGGI"
-
-
 @dataclass(frozen=True)
 class Decision:
     camera_id: str
@@ -79,7 +73,7 @@ class Decision:
     sub_status: str | None
     trace: dict[str, Any] = field(repr=False)
     verdict: LLMVerdict | None = field(default=None, repr=False)
-    fri: int | None = None
+    risk_level: str | None = None
 
     @property
     def changed(self) -> bool:
@@ -136,9 +130,9 @@ class DecisionEngine:
         self._last_rule = "R0"
         self._last_explanation = "AMAN karena belum ada bukti api atau asap."
 
-    def danger_threshold(self, fri: int | None) -> float:
+    def danger_threshold(self, risk_level: str | None) -> float:
         s = self.settings
-        return s.conf_danger_high_risk if fri is not None and fri >= s.fri_high else s.conf_danger
+        return s.conf_danger_high_risk if risk_level in HIGH_RISK_LEVELS else s.conf_danger
 
     def observe(self, local: LocalDetection) -> None:
         """Feed the T1 window. `update` calls this itself unless it was already done."""
@@ -152,11 +146,12 @@ class DecisionEngine:
         *,
         verdict: LLMVerdict | None = None,
         llm_available: bool,
-        fri: int | None = None,
+        risk_level: str | None = None,
+        fwi: float | None = None,
     ) -> Decision:
         self.observe(local)
         level_from = self.level
-        threshold = self.danger_threshold(fri)
+        threshold = self.danger_threshold(risk_level)
         new_verdict = verdict if verdict is not None and verdict.ok else None
         if new_verdict is not None:
             self.verdicts.append(new_verdict)
@@ -170,12 +165,14 @@ class DecisionEngine:
             },
             "llm": _llm_input(verdict) if verdict is not None else (None if llm_available else "llm_unavailable"),
             "confirm": f"{confirmations}/{self.settings.confirm_window}" if new_verdict else None,
-            "risk": None if fri is None else {
-                "fri": fri, "category": fri_category(fri), "threshold_used": threshold,
+            "risk": {
+                "level": risk_level,
+                "fwi": None if fwi is None else round(fwi, 1),
+                "threshold_used": threshold,
             },
         }
 
-        rule, explanation = self._evaluate(new_verdict, llm_available, threshold, confirmations, fri)
+        rule, explanation = self._evaluate(new_verdict, llm_available, threshold, confirmations, risk_level)
         if rule == "R6":
             inputs["clear"] = f"{self._clear_steps}/{self.settings.clear_steps}"
 
@@ -195,7 +192,7 @@ class DecisionEngine:
             sub_status=self.sub_status,
             trace=trace,
             verdict=verdict,
-            fri=fri,
+            risk_level=risk_level,
         )
 
     # --- rules ------------------------------------------------------------------
@@ -206,7 +203,7 @@ class DecisionEngine:
         llm_available: bool,
         threshold: float,
         confirmations: int,
-        fri: int | None,
+        risk_level: str | None,
     ) -> tuple[str, str]:
         s = self.settings
         clean_step = False
@@ -218,7 +215,7 @@ class DecisionEngine:
 
             if real and v.confidence >= threshold and confirmed:
                 self._raise_to(Level.BAHAYA, None)
-                return self._remember("R1", self._explain_r1(v, threshold, confirmations, fri))
+                return self._remember("R1", self._explain_r1(v, threshold, confirmations, risk_level))
             if real and v.confidence >= s.conf_warn:
                 self._raise_to(Level.WASPADA, None)
                 return self._remember("R2", self._explain_r2(v, threshold, confirmations))
@@ -304,9 +301,11 @@ class DecisionEngine:
 
     # --- explanation templates -----------------------------------------------------
 
-    def _explain_r1(self, v: LLMVerdict, threshold: float, confirmations: int, fri: int | None) -> str:
+    def _explain_r1(self, v: LLMVerdict, threshold: float, confirmations: int, risk_level: str | None) -> str:
         s = self.settings
-        lowered = f", ambang diturunkan karena FRI {fri}" if threshold < s.conf_danger else ""
+        lowered = (
+            f", ambang diturunkan karena risiko kawasan {risk_level}" if threshold < s.conf_danger else ""
+        )
         if confirmations >= s.confirm_min:
             confirm = f"terkonfirmasi {confirmations} dari {s.confirm_window} cek"
         else:

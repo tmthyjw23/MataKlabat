@@ -117,7 +117,6 @@ def test_level_lower():
 
 # --- T6: rules with LLM verdicts ---------------------------------------------------
 
-from mataklabat.decision import fri_category  # noqa: E402
 from mataklabat.vision_llm import LLMVerdict  # noqa: E402
 
 
@@ -133,9 +132,9 @@ def v(conf=0.8, *, smoke=True, fire=False, hazard=None, lookalike="none", risks=
 CLEAN_V = v(0.9, smoke=False)
 
 
-def step(engine, verdict=None, scores=CLEAN, fri=None, llm_available=True):
+def step(engine, verdict=None, scores=CLEAN, risk=None, llm_available=True):
     local = LocalDetection("CAM-01", now_local(), *scores)
-    return engine.update(local, verdict=verdict, llm_available=llm_available, fri=fri)
+    return engine.update(local, verdict=verdict, llm_available=llm_available, risk_level=risk, fwi=24.0 if risk else None)
 
 
 def test_r1_single_verdict_above_090_is_enough(engine):
@@ -216,17 +215,20 @@ def test_rule_priority(engine, verdict, rule):
     assert step(engine, verdict).rule == rule
 
 
-def test_high_fri_lowers_danger_threshold(engine):
-    step(engine, v(0.65), fri=72)
-    d = step(engine, v(0.65), fri=72)
+@pytest.mark.parametrize("level", ["Tinggi", "Sangat Tinggi"])
+def test_high_area_risk_lowers_danger_threshold(engine, level):
+    step(engine, v(0.65), risk=level)
+    d = step(engine, v(0.65), risk=level)
     assert (d.level, d.rule) == (Level.BAHAYA, "R1")
-    assert "ambang diturunkan karena FRI 72" in d.explanation
-    assert d.trace["inputs"]["risk"] == {"fri": 72, "category": "TINGGI", "threshold_used": 0.6}
+    assert f"ambang diturunkan karena risiko kawasan {level}" in d.explanation
+    assert d.trace["inputs"]["risk"] == {"level": level, "fwi": 24.0, "threshold_used": 0.6}
+    assert d.risk_level == level
 
 
-def test_normal_fri_keeps_default_threshold(engine):
-    step(engine, v(0.65), fri=40)
-    d = step(engine, v(0.65), fri=40)
+@pytest.mark.parametrize("level", ["Rendah", "Sedang", None])
+def test_low_or_unknown_area_risk_keeps_default_threshold(engine, level):
+    step(engine, v(0.65), risk=level)
+    d = step(engine, v(0.65), risk=level)
     assert (d.level, d.rule) == (Level.WASPADA, "R2")
 
 
@@ -262,8 +264,3 @@ def test_trace_includes_llm_inputs(engine):
         "hazard_type": "smoke", "confidence": 0.86, "lookalike": "none", "prompt": "v2",
     }
     assert d.verdict is not None and d.verdict.confidence == 0.86
-
-
-@pytest.mark.parametrize(("fri", "cat"), [(None, None), (0, "RENDAH"), (29, "RENDAH"), (30, "SEDANG"), (59, "SEDANG"), (60, "TINGGI")])
-def test_fri_category(fri, cat):
-    assert fri_category(fri) == cat

@@ -170,7 +170,15 @@ Ini data **model cuaca** (resolusi beberapa km), bukan stasiun BMKG; web menyebu
 
 ### 6.4 Kelas risiko
 
-Ambang Rendah/Sedang/Tinggi/Sangat Tinggi **diambil dari publikasi pengembangan FDRS Indonesia** (de Groot dkk.; ringkasan di ASEAN Haze Portal), dengan sumber ditulis di kode dan README. Jika ambang resmi tidak bisa diakses, ambang diturunkan dari literatur yang tersedia (misal FFMC > 82 mudah menyala, DC > 400 kabut asap parah), ditandai **"perlu konfirmasi BMKG"** di web dan laporan.
+FDRS Indonesia tidak memberi kelas untuk angka FWI; kelasnya per indikator. Sumber: de Groot dkk. (2006), *Development of the Indonesian and Malaysian Fire Danger Rating Systems*, Mitig Adapt Strat Glob Change 12:165–180, tabel 1–3:
+
+| Indikator | Arti | Rendah | Sedang | Tinggi | Sangat Tinggi (Extreme) |
+|---|---|---|---|---|---|
+| FFMC | potensi penyalaan | 0–72 | 73–77 | 78–82 | 83+ |
+| DC | kekeringan / potensi asap | < 140 | 140–260 | 260–350 | > 350 |
+| ISI | sulitnya pemadaman (padang rumput) | 0–1 | 2–3 | 4–5 | 6+ |
+
+**Risiko Kawasan = kelas tertinggi di antara ketiganya**, dan web menampilkan indikator penentunya (misal "Tinggi karena potensi penyalaan"). Agregasi "kelas tertinggi" adalah keputusan tim (paper menampilkan ketiganya terpisah) dan dicatat di Decision Log. FWI tetap dihitung dan ditampilkan sebagai angka pendamping. Catatan: ambang DC dikalibrasi untuk kabut asap gambut; untuk Klabat (hutan pegunungan) dibaca sebagai indikator kekeringan.
 
 Komponen yang ditampilkan dalam bahasa awam: *Kekeringan tanah* (DC), *Mudah menyala* (FFMC), *Angin*, *Hari tanpa hujan*.
 

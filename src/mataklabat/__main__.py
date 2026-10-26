@@ -16,6 +16,7 @@ from mataklabat.camera import CameraSource
 from mataklabat.config import PROMPT_VERSIONS, TIMEZONE, ConfigError, Settings, load_settings, now_local
 from mataklabat.pipeline import Monitor
 from mataklabat.prompts import PromptContext
+from mataklabat.risk import RiskService
 from mataklabat.vision_llm import VisionVerifier
 
 log = logging.getLogger("mataklabat")
@@ -60,7 +61,7 @@ def cmd_run(settings: Settings, args: argparse.Namespace) -> int:
     print(f"MataKlabat: {len(settings.cameras)} kamera, {mode}.")
     for cam in settings.cameras:
         print(f"  {cam.id}  {cam.name}  (sumber: {cam.source})")
-    Monitor(settings).run_forever(duration_s=args.duration)
+    Monitor(settings, risk=RiskService(*settings.risk_point)).run_forever(duration_s=args.duration)
     return 0
 
 

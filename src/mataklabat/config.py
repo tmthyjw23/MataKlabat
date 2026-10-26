@@ -116,7 +116,6 @@ class Settings:
     confirm_min: int = 2
     clear_steps: int = 4
     agent_cooldown_s: float = 600.0
-    fri_high: int = 60
 
     @property
     def runtime_dir(self) -> Path:
@@ -129,6 +128,14 @@ class Settings:
     @property
     def snapshot_dir(self) -> Path:
         return self.runtime_dir / "snapshots"
+
+    @property
+    def risk_point(self) -> tuple[float, float]:
+        """Where area weather is taken: the first reference point (Puncak Klabat), else the first camera."""
+        if self.resources.reference_points:
+            ref = self.resources.reference_points[0]
+            return ref.lat, ref.lon
+        return self.cameras[0].lat, self.cameras[0].lon
 
     def camera(self, camera_id: str) -> CameraConfig:
         for cam in self.cameras:
