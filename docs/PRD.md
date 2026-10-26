@@ -4,14 +4,14 @@
 |---|---|
 | **Produk** | MataKlabat: Sistem Peringatan Dini Karhutla Gunung Klabat |
 | **Konteks** | Tugas mata kuliah Artificial Intelligence (Lecture 20: Decision Making in AI), FILKOM UNKLAB |
-| **Versi** | 0.1 (prototipe demo) |
+| **Versi** | 0.2 (v2: dua status, Telegram otomatis, web FastAPI; lihat `superpowers/specs/2026-10-26-mataklabat-v2-design.md`) |
 | **Tanggal** | 26 Oktober 2026 |
 
 ## 1. Masalah
 
 Karhutla di kaki Gunung Klabat yang dimulai **19 September 2026** meluas dari 60 ha menjadi ±651 ha (termasuk ±131,59 ha hutan lindung). Api belum padam lebih dari 21 hari, dan status tanggap darurat diperpanjang hingga 21 Oktober 2026. Pemantauan saat ini bergantung pada **laporan warga** dan **satelit yang terhalang awan**. Akibatnya titik api baru (Matungkas, Laikit) baru diketahui setelah membesar. Lihat [`RCA.md`](RCA.md).
 
-**Problem statement:** *Bagaimana kita bisa mengetahui titik api atau asap di kawasan Gunung Klabat dalam hitungan menit, bukan jam, dan langsung tahu harus berbuat apa?*
+**Problem statement:** *Bagaimana kita bisa tahu kapan kawasan Gunung Klabat rawan terbakar, mengetahui titik api atau asap dalam hitungan menit (bukan jam), dan langsung tahu harus berbuat apa?*
 
 ## 2. Pengguna
 
@@ -43,13 +43,15 @@ Karhutla di kaki Gunung Klabat yang dimulai **19 September 2026** meluas dari 60
 | F3 | Verifikasi LLM Vision (via 9router) dengan output JSON terstruktur (ARCHITECTURE §5) | Must |
 | F4 | Decision Engine dengan aturan R0–R6 dan state machine (ARCHITECTURE §6) | Must |
 | F5 | Decision trace tersimpan untuk setiap event | Must |
-| F6 | Dashboard: grid kamera, peta, panel "Mengapa?", log insiden | Must |
-| F7 | Fire Risk Index dari Open-Meteo | Should |
+| F6 | Website: risiko kawasan, grid kamera, peta (topografi/satelit/jalan), panel "Mengapa?", insiden, kesehatan sistem | Must |
+| F7 | Risiko Kebakaran Kawasan (FWI + kelas FDRS Indonesia) dari Open-Meteo, dengan prakiraan 3 hari | Must |
 | F8 | AI Agent dengan function calling dan laporan insiden | Should |
-| F9 | Notifikasi Telegram (manual dan opsional otomatis) | Could |
+| F9 | Telegram otomatis bertingkat dengan foto, alasan, dan data yang dipakai; antrean + kirim ulang | Must |
 | F10 | Hotspot NASA FIRMS di peta dan sebagai tool agent | Could |
 | F11 | Script evaluasi: metrics, perbandingan prompt v1/v2, uji konsistensi | Must (untuk laporan) |
 | F12 | Mode `--no-llm` (offline) | Should |
+| F13 | Kamera Foto (folder) untuk demo tanpa kamera lapangan | Must |
+| F14 | Satu perintah `up`, restart otomatis, heartbeat, log, retensi | Must |
 
 ## 5. Kebutuhan Non-Fungsional
 

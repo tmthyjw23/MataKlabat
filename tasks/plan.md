@@ -1,3 +1,5 @@
+> **v2 (26 Okt 2026):** rencana ini digantikan oleh spec `docs/superpowers/specs/2026-10-26-mataklabat-v2-design.md` dan task T7–T15 di `tasks/todo.md`. Isi di bawah adalah rencana awal (v1).
+
 # Implementation Plan: MataKlabat (build 1 hari)
 
 ## Overview

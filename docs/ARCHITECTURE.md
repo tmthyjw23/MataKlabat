@@ -9,67 +9,58 @@ Dokumen ini adalah **kontrak teknis** sistem. AI coding agent harus mengikuti na
 1. **Murah dulu, mahal belakangan.** Detektor lokal berjalan di setiap frame. LLM hanya dipanggil saat ada sinyal atau heartbeat.
 2. **Tidak ada keputusan dari satu bukti.** BAHAYA hanya diputuskan jika bukti lokal, verifikasi LLM, dan persistensi sejalan.
 3. **Setiap keputusan bisa dijelaskan.** Semua transisi status menyimpan *decision trace*.
-4. **Degradasi anggun.** Tanpa internet atau API key, sistem tetap berjalan dengan detektor lokal (status maksimal WASPADA, ditandai `llm_unavailable`).
+4. **Degradasi anggun.** Tanpa internet atau LLM, sistem tetap berjalan dengan detektor lokal (status maksimal WASPADA/Perlu Dicek, ditandai `llm_unavailable`).
 5. **Dua proses, satu database.** `monitor` menulis ke SQLite dan snapshot JPEG, `dashboard` hanya membaca. Dashboard yang crash tidak menghentikan pemantauan.
 
 ---
 
 ## 2. Komponen
 
-| Modul | Tanggung jawab | Input → Output |
-|---|---|---|
-| `config.py` | Memuat `.env`, `cameras.yaml`, `resources.yaml` menjadi dataclass `Settings` | file → `Settings` |
-| `camera.py` | `CameraSource`: buka webcam (int), file video (loop), atau URL RTSP. Thread pembaca menyimpan frame terbaru | source → `Frame(camera_id, ts, image)` |
-| `detector.py` | Tahap 1. `ColorMotionDetector` (default), `YoloDetector` (opsional, jika `YOLO_WEIGHTS` diisi) | `Frame` → `LocalDetection` |
-| `prompts.py` | Prompt `v1` (polos) dan `v2` (sadar lookalike + konteks Klabat) | – |
-| `vision_llm.py` | Tahap 2. Kirim frame (JPEG ≤ 1024 px) + konteks ke LLM vision via 9router (OpenAI-compatible), paksa output JSON sesuai skema §5 | `Frame`, ctx → `LLMVerdict` |
-| `risk.py` | Ambil cuaca dari Open-Meteo (cache 15 menit), hitung Fire Risk Index | lat, lon → `RiskSnapshot` |
-| `decision.py` | `DecisionEngine` per kamera: fusi bukti + state machine §6 | bukti → `Decision` (+ trace) |
-| `tools.py` | Fungsi-fungsi tool agent §7 | – |
-| `agent.py` | `IncidentAgent`: loop tool calling (OpenAI-compatible, via 9router), maks 6 langkah | `Incident` → `IncidentReport` |
-| `notifier.py` | `ConsoleNotifier`, `TelegramNotifier` | pesan → terkirim |
-| `storage.py` | SQLite (WAL mode): tabel §9 | – |
-| `pipeline.py` | Orkestrasi: satu `CameraWorker` (thread) per kamera | – |
-| `__main__.py` | CLI `run`, `check` | – |
-| `app.py` | Dashboard Streamlit, read-only | DB + snapshot → UI |
-| `scripts/evaluate.py` | Evaluasi offline pada test set | folder gambar → metrics |
+> v2: detail desain lengkap di [`superpowers/specs/2026-10-26-mataklabat-v2-design.md`](superpowers/specs/2026-10-26-mataklabat-v2-design.md) ("Spec").
+
+| Modul | Tanggung jawab |
+|---|---|
+| `config.py` | `.env` + `cameras.yaml` + `resources.yaml` → `Settings` (semua konstanta bisa di-override env) |
+| `camera.py` | `CameraSource` (webcam, video berulang, RTSP) dan `FolderSource` (Kamera Foto: foto terbaru di folder) |
+| `detector.py` | Tahap 1: `ColorMotionDetector` (warna + gerak; warna saja untuk Kamera Foto), slot `YoloDetector` |
+| `prompts.py`, `vision_llm.py` | Tahap 2: verifikasi LLM vision via 9router (OpenAI-compatible), kontrak JSON §5, rate limiter global |
+| `decision.py` | Decision Engine R0–R6, konfirmasi, trace + penjelasan deterministik |
+| `fwi.py`, `risk.py` | Risiko Kawasan: FWI Kanada + kelas FDRS Indonesia dari cuaca Open-Meteo (§6.1) |
+| `pipeline.py` | `CameraWorker` per kamera, trigger T1–T3, `LLMScheduler` (prioritas global), `Monitor` |
+| `storage.py`, `snapshots.py`, `recorder.py` | SQLite (§9), foto terbaru + arsip, event/status/insiden |
+| `messages.py`, `alerts.py`, `notifier.py` | Template pesan, kebijakan peringatan bertingkat, outbox + Telegram |
+| `tools.py`, `agent.py` | AI Agent (tool calling) untuk laporan insiden + laporan template cadangan |
+| `monitor.py`, `supervisor.py`, `logs.py` | Perakitan monitor + heartbeat/retensi, perintah `up`, log berotasi |
+| `web/app.py`, `web/static/` | Website FastAPI read-only + halaman HTML/JS (dashboard, insiden, kesehatan) |
+| `evaluation.py`, `scripts/evaluate.py` | Evaluasi offline + analisis kegagalan F1–F5 |
+| `__main__.py` | CLI `up`, `run`, `web`, `check` |
 
 ---
 
 ## 3. Alur Data
 
 ```mermaid
-sequenceDiagram
-    autonumber
-    participant Cam as CameraSource
-    participant W as CameraWorker
-    participant D1 as Detektor Lokal
-    participant L as LLM Vision (9router)
-    participant R as RiskService
-    participant E as DecisionEngine
-    participant A as IncidentAgent
-    participant DB as SQLite
-
-    loop setiap ~0.5 detik (PROCESS_FPS=2)
-        W->>Cam: latest_frame()
-        W->>D1: detect(frame)
-        D1-->>W: fire_score, smoke_score, boxes
-        alt trigger lokal persisten ATAU heartbeat ATAU status ≠ AMAN
-            W->>L: verify(frame, ctx) [rate-limited]
-            L-->>W: LLMVerdict (JSON)
-        end
-        W->>R: current(lat, lon) [cache 15 menit]
-        W->>E: update(local, verdict?, risk)
-        E-->>W: Decision(level, rule, trace)
-        W->>DB: insert event (jika level berubah / tiap 10 dtk) + snapshot
-        opt transisi ke BAHAYA (cooldown 10 menit)
-            W->>A: handle(incident)
-            A->>A: function calling (cuaca, hotspot, sebaran, sumber daya)
-            A-->>DB: incident_report
-            A-->>A: send_alert
-        end
+flowchart LR
+    subgraph monitor["Proses monitor (python -m mataklabat run)"]
+      C[Kamera / Kamera Foto] --> D[Detektor lokal]
+      D --> W{Trigger T1–T3}
+      W -- ya --> L[LLM vision via 9router]
+      D --> E[Decision Engine R0–R6]
+      L --> E
+      R[RiskService: Open-Meteo → FWI/FDRS] --> E
+      E --> REC[Recorder]
+      REC --> AL[AlertService]
+      AL -- Kebakaran Terdeteksi --> AG[IncidentReporter + AI Agent]
+      AG --> AL
+      AL --> OB[(outbox)]
+      OB --> TG[OutboxSender → Telegram]
     end
+    REC --> DB[(SQLite WAL + foto)]
+    R --> DB
+    DB --> WEB["Proses web (FastAPI, read-only) → browser via SSE"]
 ```
+
+`python -m mataklabat up` menjalankan kedua proses dan menyalakan ulang yang crash.
 
 ---
 
@@ -177,33 +168,29 @@ Jawab HANYA dalam JSON sesuai skema. reasoning dan evidence dalam Bahasa Indones
 
 ## 6. Decision Engine
 
-### 6.1 Fire Risk Index (FRI)
+### 6.1 Risiko Kawasan (FWI + FDRS Indonesia)
 
-Dari Open-Meteo (`current`: `temperature_2m`, `relative_humidity_2m`, `wind_speed_10m`, `wind_direction_10m`; `daily`: `precipitation_sum` 14 hari terakhir via `past_days=14`):
+Pengganti FRI heuristik (v1). Cuaca per jam Open-Meteo untuk Puncak Klabat → pengamatan pukul 12:00 WITA + hujan 24 jam → rantai FWI Kanada (Van Wagner 1987; penyesuaian lintang ekuator seperti `cffdrs`). Kelas FDRS Indonesia (de Groot dkk. 2006):
 
-```
-dryness = clip((70 - RH) / 50, 0, 1)
-heat    = clip((T - 24) / 12, 0, 1)
-wind    = clip(W_kmh / 30, 0, 1)
-drought = clip(hari_tanpa_hujan(≥1 mm) / 14, 0, 1)
+| Indikator | Rendah | Sedang | Tinggi | Sangat Tinggi |
+|---|---|---|---|---|
+| FFMC (potensi penyalaan) | 0–72 | 73–77 | 78–82 | 83+ |
+| DC (kekeringan/asap) | < 140 | 140–260 | 260–350 | > 350 |
+| ISI (sulitnya pemadaman) | 0–1 | 2–3 | 4–5 | 6+ |
 
-FRI = round(100 × (0.35·dryness + 0.15·heat + 0.25·wind + 0.25·drought))
-Kategori: < 30 RENDAH · 30–59 SEDANG · ≥ 60 TINGGI
-```
-
-> FRI adalah **heuristik** yang dirancang tim untuk tugas ini. Bobotnya dipilih karena kelembapan rendah dan kemarau panjang adalah faktor dominan. Jelaskan ini di laporan, jangan diklaim sebagai indeks resmi.
+**Risiko Kawasan = kelas tertinggi** dari ketiganya; ambang BAHAYA turun ke `CONF_DANGER_HIGH_RISK` saat Tinggi/Sangat Tinggi. Data > 6 jam = tidak diketahui (ambang default). Rincian: Spec §6.
 
 ### 6.2 Ambang
 
 | Konstanta | Nilai | Keterangan |
 |---|---|---|
 | `CONF_DANGER` | 0.70 | confidence minimum LLM untuk BAHAYA |
-| `CONF_DANGER_HIGH_RISK` | 0.60 | dipakai jika FRI ≥ 60 |
+| `CONF_DANGER_HIGH_RISK` | 0.60 | dipakai jika risiko kawasan Tinggi atau Sangat Tinggi |
 | `CONF_WARN` | 0.40 | |
 | `CONFIRM_WINDOW` | 3 | jumlah verdict LLM terakhir yang dilihat |
 | `CONFIRM_MIN` | 2 | minimal verdict positif di window (atau 1 jika confidence ≥ 0.90) |
 | `CLEAR_STEPS` | 4 | verdict/frame bersih berturut-turut untuk turun 1 level |
-| `AGENT_COOLDOWN_S` | 600 | agent tidak dipanggil ulang untuk kamera yang sama |
+| `AGENT_COOLDOWN_S` | 600 | AI Agent tidak dipanggil ulang untuk kamera yang sama (pakai laporan template) |
 
 ### 6.3 Aturan (dievaluasi berurutan, aturan pertama yang cocok menang)
 
@@ -217,7 +204,7 @@ Kategori: < 30 RENDAH · 30–59 SEDANG · ≥ 60 TINGGI
 | **R6** | Tidak ada bukti selama `CLEAR_STEPS` | turun 1 level (BAHAYA → WASPADA → AMAN) |
 | **R0** | Default | **AMAN** |
 
-`ambang_bahaya = CONF_DANGER_HIGH_RISK if FRI ≥ 60 else CONF_DANGER`
+`ambang_bahaya = CONF_DANGER_HIGH_RISK if risiko kawasan ∈ {Tinggi, Sangat Tinggi} else CONF_DANGER`
 
 ### 6.4 State machine
 
@@ -250,9 +237,9 @@ Setiap `Decision` menyimpan `trace` (JSON):
     "local": {"fire_score": 0.31, "smoke_score": 0.44, "t1_hits": "4/5"},
     "llm": {"hazard_type": "smoke", "confidence": 0.86, "lookalike": "none", "prompt": "v2"},
     "confirm": "2/3",
-    "risk": {"fri": 72, "category": "TINGGI", "threshold_used": 0.60}
+    "risk": {"level": "Tinggi", "fwi": 8.2, "threshold_used": 0.60}
   },
-  "explanation": "BAHAYA karena LLM melihat asap (0.86 ≥ 0.60, ambang diturunkan karena FRI 72), bukan lookalike, terkonfirmasi 2 dari 3 cek."
+  "explanation": "Kebakaran Terdeteksi karena AI melihat asap (0.86 ≥ 0.60, ambang diturunkan karena risiko kawasan Tinggi), bukan lookalike, terkonfirmasi 2 dari 3 cek."
 }
 ```
 
@@ -268,16 +255,15 @@ Saat sebuah kamera masuk BAHAYA, `IncidentAgent` menyusun **laporan insiden yang
 
 ### 7.2 Tools
 
-| Tool | Parameter | Kembalian | Sumber |
-|---|---|---|---|
-| `get_weather` | `lat, lon` | suhu, RH, angin (km/j, arah°), FRI | Open-Meteo |
-| `get_satellite_hotspots` | `lat, lon, radius_km=10` | daftar hotspot 24 jam (lat, lon, confidence, waktu) atau `{"status":"unavailable"}` | NASA FIRMS (opsional) |
-| `estimate_spread` | `camera_id, wind_dir_deg, wind_kmh` | arah sebaran (mata angin), desa dari `resources.yaml` yang berada dalam sektor ±45° searah angin dan ≤ 8 km, beserta jaraknya | lokal (haversine + bearing) |
-| `find_nearest_resources` | `lat, lon, kind?` | posko/damkar/puskesmas terdekat dari `resources.yaml` | lokal |
-| `get_recent_events` | `camera_id, minutes=30` | ringkasan event kamera itu | SQLite |
-| `send_alert` | `level, title, message` | status kirim | Console selalu. Telegram jika `AUTO_SEND_ALERT=true` |
+| Tool | Parameter | Kembalian |
+|---|---|---|
+| `get_weather` | `lat, lon` | cuaca terkini + risiko kawasan (dari RiskService) |
+| `get_satellite_hotspots` | `lat, lon, radius_km=10` | hotspot NASA FIRMS 24 jam, atau `{"status":"unavailable"}` |
+| `estimate_spread` | `camera_id, wind_dir_deg, wind_kmh` | arah sebaran (angin dari X° → ke X+180°), desa dalam ±45° dan ≤ 8 km |
+| `find_nearest_resources` | `lat, lon, kind?` | posko/damkar terdekat; kontak belum terverifikasi = "belum diisi" |
+| `get_recent_events` | `camera_id, minutes=30` | ringkasan keputusan kamera |
 
-> Catatan arah: angin dari arah X° mendorong api **ke** arah (X+180)° mod 360. `estimate_spread` wajib memakai konversi ini, dan unit test harus mengujinya.
+Agent **tidak** mengirim pesan. Laporannya disimpan di `incidents.report_md` dan dikirim sebagai pesan kedua lewat outbox (§7.4). Gagal/timeout/cooldown → laporan template dari tool yang sama.
 
 ### 7.3 System prompt agent (ringkas)
 
@@ -290,10 +276,9 @@ bagian: Ringkasan, Bukti, Kondisi Cuaca & Risiko, Arah Sebaran & Desa Terancam, 
 karakter. Jangan mengarang data yang tidak dikembalikan tools; tulis "tidak tersedia" jika kosong.
 ```
 
-### 7.4 Human-in-the-loop
+### 7.4 Peringatan (Spec §8)
 
-- Default `AUTO_SEND_ALERT=false`: laporan hanya muncul di dashboard dan console. Operator menekan tombol **"Kirim ke Telegram"** di dashboard.
-- Laporan agent selalu menyertakan label *"Dihasilkan AI. Verifikasi lapangan diperlukan."*
+Bertingkat dan otomatis lewat tabel `outbox`: Kebakaran Terdeteksi (langsung, dengan foto), Perlu Dicek (maks 1 per kamera per `CHECK_ALERT_COOLDOWN_S`), laporan AI (pesan kedua), risiko kawasan naik ke Tinggi/Sangat Tinggi, ringkasan pagi `MORNING_SUMMARY_AT`. `AUTO_SEND_ALERT=false` atau Telegram belum diisi = mode kering (pesan dibuat, tidak dikirim). Laporan selalu diberi label *"Dihasilkan AI. Verifikasi lapangan diperlukan."*
 
 ---
 
@@ -305,79 +290,32 @@ Kasus-kasus ini **wajib diuji** di `scripts/evaluate.py` dan dibahas di laporan.
 |---|---|---|---|---|
 | F1 | **Kabut/awan Klabat dikira asap** | False positive | Abu-abu, bergerak, menutupi lereng. Mirip asap bagi detektor warna dan kadang bagi LLM | Prompt v2 menjelaskan beda kabut dan asap. Field `lookalike`. Aturan R5. Konfirmasi 2/3 |
 | F2 | **Cahaya senja/lampu dikira api** | False positive | Warna oranye-merah dengan saturasi tinggi | Mask gerak (senja tidak berkedip). Konteks waktu lokal di prompt. Kategori `sunset_glare`/`artificial_light` |
-| F3 | **Asap tipis/jauh atau malam hari tidak terdeteksi** | False negative | Area piksel kecil, kontras rendah, webcam gelap | Heartbeat T3. FRI menurunkan ambang. Diakui sebagai keterbatasan |
+| F3 | **Asap tipis/jauh atau malam hari tidak terdeteksi** | False negative | Area piksel kecil, kontras rendah, webcam gelap | Heartbeat T3. Risiko kawasan tinggi menurunkan ambang. Diakui sebagai keterbatasan |
 | F4 | **Inkonsistensi LLM** | Ketidakstabilan | Gambar sama → label/confidence berbeda | Konfirmasi multi-verdict. Ukur dengan `--repeat 3` |
 | F5 | **Prompt mempengaruhi keputusan** | Sensitivitas prompt | v1 cenderung "ya ada asap" pada kabut | Bandingkan v1 dan v2 di evaluasi |
 
 ---
 
-## 9. Skema Database (SQLite, `data/runtime/events.db`)
+## 9. Skema Database (SQLite WAL, `data/runtime/events.db`)
 
-```sql
-CREATE TABLE IF NOT EXISTS events (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  ts TEXT NOT NULL,                 -- ISO8601, zona Asia/Makassar
-  camera_id TEXT NOT NULL,
-  level TEXT NOT NULL,              -- AMAN | WASPADA | BAHAYA
-  sub_status TEXT,                  -- POTENSI | unverified | rejected_lookalike | NULL
-  fire_score REAL, smoke_score REAL,
-  llm_json TEXT,                    -- LLMVerdict mentah (nullable)
-  fri INTEGER,
-  rule TEXT,
-  trace_json TEXT NOT NULL,
-  snapshot_path TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_events_cam_ts ON events(camera_id, ts);
+Definisi lengkap ada di `storage.py` (`SCHEMA`). Tabel:
 
-CREATE TABLE IF NOT EXISTS incidents (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  opened_ts TEXT NOT NULL,
-  closed_ts TEXT,
-  camera_id TEXT NOT NULL,
-  peak_level TEXT NOT NULL,
-  trigger_event_id INTEGER REFERENCES events(id),
-  report_md TEXT,                   -- laporan agent (markdown)
-  agent_steps_json TEXT,            -- jejak tool call agent
-  alert_sent INTEGER DEFAULT 0
-);
+| Tabel | Isi |
+|---|---|
+| `events` | keputusan per kamera: level, sub-status, skor, verdict LLM (`llm_json`), `risk_level`, `fwi`, rule, `trace_json`, foto arsip |
+| `incidents` | insiden (BAHAYA → dibuka, kembali AMAN → ditutup), laporan, langkah agent, id pesan outbox |
+| `camera_status` | 1 baris per kamera: status terkini, penjelasan, alasan AI terakhir, online/offline |
+| `risk_daily`, `risk_current` | riwayat/prakiraan harian FWI dan snapshot risiko terkini (JSON) |
+| `outbox` | pesan Telegram: `pending`/`sent`/`failed`/`dry_run`, percobaan, error |
+| `component_health` | kesehatan monitor, cuaca, LLM, Telegram (heartbeat tiap 5 dtk; `ok=-1` = nonaktif) |
 
-CREATE TABLE IF NOT EXISTS camera_status (   -- 1 baris per kamera, di-upsert
-  camera_id TEXT PRIMARY KEY,
-  ts TEXT NOT NULL,
-  level TEXT NOT NULL,
-  fri INTEGER,
-  last_snapshot TEXT,
-  last_reasoning TEXT,
-  online INTEGER NOT NULL
-);
-```
-
-Penulisan `events`: saat level berubah, tiap kali ada verdict LLM, dan minimal 1x per 10 detik per kamera (heartbeat ringan). Snapshot disimpan ke `data/runtime/snapshots/{camera_id}/latest.jpg` (ditimpa), dan juga ke file berstempel waktu saat level ≥ WASPADA.
+Event ditulis saat level berubah, ada verdict, atau ≥ 10 dtk; arsip foto untuk level ≥ WASPADA; retensi 7 hari (event pemicu insiden disimpan).
 
 ---
 
-## 10. Dashboard (`app.py`)
+## 10. Website (`web/`)
 
-Auto-refresh tiap 1 detik (`st.fragment(run_every=1)`), read-only dari DB dan snapshot.
-
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ 🔥👁️ MataKlabat   Status kawasan: ● WASPADA   FRI 64 (TINGGI)  🕒 14:32 │
-├───────────────────────────────┬──────────────────────────────────────┤
-│  Grid kamera 2×2              │   🗺️ Peta Gunung Klabat (folium)      │
-│  [CAM-01 ● BAHAYA ] [CAM-02 ●]│   marker per kamera (hijau/kuning/    │
-│  [CAM-03 ●        ] [CAM-04 ●]│   merah) + panah arah angin +         │
-│  (snapshot terbaru + bbox)    │   hotspot FIRMS (jika ada)            │
-├───────────────────────────────┴──────────────────────────────────────┤
-│ 🧠 Mengapa? (kamera terpilih): decision trace + reasoning LLM + bukti │
-├──────────────────────────────────────────────────────────────────────┤
-│ 🚨 Insiden: laporan agent (markdown) · [Kirim ke Telegram]            │
-├──────────────────────────────────────────────────────────────────────┤
-│ 📈 Riwayat: fire/smoke score & level per kamera (plotly), tabel event │
-└──────────────────────────────────────────────────────────────────────┘
-```
-
-Warna status: AMAN `#2E7D32`, WASPADA `#F9A825`, BAHAYA `#C62828`, offline `#757575`.
+FastAPI read-only (`python -m mataklabat web`, default `127.0.0.1:8000`) + HTML/CSS/JS tanpa build step. Halaman: dashboard (`/`), detail insiden (`/incident/{id}`), kesehatan sistem (`/health`). Update live lewat SSE `/api/stream`. Peta Leaflet (lokal) dengan OpenTopoMap (default), Sentinel-2 cloudless (EOX), OpenStreetMap. Status = bentuk + warna + teks: Normal (`#1F7A4D`, lingkaran), Perlu Dicek (`#B45309`, segitiga), Kebakaran Terdeteksi (`#B42318`, segi delapan), Offline (`#5B6560`). Keamanan: CSP tanpa inline script, teks API selalu dirender sebagai teks, foto diakses lewat ID. Rincian: Spec §10.
 
 ---
 

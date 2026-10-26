@@ -1,0 +1,4 @@
+# Keep vendored files byte-identical to the upstream release.
+src/mataklabat/web/static/vendor/** -text
+*.png binary
+*.jpg binary
