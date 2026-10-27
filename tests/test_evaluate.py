@@ -60,7 +60,9 @@ def test_evaluate_metrics_and_outputs(test_set, tmp_path):
     assert v2["false_alarm_fog"] == 1.0 and v2["false_alarm_sunset"] == 0.0 and v2["false_alarm_normal"] == 0.0
     assert v2["consistency"] == 1.0
     assert rows["v1"]["false_alarm_normal"] == 1.0  # v1 says "smoke" everywhere
-    assert rows["local"]["precision"] is None  # the detector alone never reaches BAHAYA
+    assert rows["local"]["recall"] == 1.0  # for the detector, any alert counts
+    assert v2["lookalike_named_right"] == pytest.approx(2 / 6, abs=0.001)  # only "lights" named right in the fake
+    assert v2["normal_called_lookalike"] == 0.0
 
     paths = write_outputs(preds, tmp_path / "results")
     with paths["predictions"].open(encoding="utf-8") as fh:

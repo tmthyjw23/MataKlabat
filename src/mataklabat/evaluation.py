@@ -33,6 +33,7 @@ CLASSES = POSITIVE_CLASSES + LOOKALIKE_CLASSES + ("normal",)
 LEVELS = ("AMAN", "WASPADA", "BAHAYA")
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
 MAX_CONSECUTIVE_ERRORS = 3
+EXPECTED_LOOKALIKE = {"fog": "fog_cloud", "sunset": "sunset_glare", "lights": "artificial_light"}
 RETRY_WAIT_S = 10.0
 
 
@@ -65,6 +66,10 @@ class Prediction:
 
     @property
     def alarm(self) -> bool:
+        """For the LLM variants: Kebakaran Terdeteksi. The local detector can never decide
+        that on its own (rule R4 caps it at Perlu Dicek), so for it any alert counts."""
+        if self.variant == "local":
+            return self.level != "AMAN"
         return self.level == "BAHAYA"
 
     @property
@@ -212,6 +217,13 @@ def metrics(predictions: list[Prediction]) -> list[dict[str, Any]]:
         for cls in LOOKALIKE_CLASSES + ("normal",):
             subset = [p for p in preds if p.label == cls]
             row[f"false_alarm_{cls}"] = _ratio(sum(p.alarm for p in subset), len(subset))
+        if variant != "local":
+            # Explainability: did the model name the right kind of lookalike?
+            named = [p for p in preds if p.label in EXPECTED_LOOKALIKE]
+            row["lookalike_named_right"] = _ratio(
+                sum(p.lookalike == EXPECTED_LOOKALIKE[p.label] for p in named), len(named))
+            normals = [p for p in preds if p.label == "normal"]
+            row["normal_called_lookalike"] = _ratio(sum(p.lookalike not in ("", "none") for p in normals), len(normals))
         repeated = [p for p in preds if len(p.repeats) > 1]
         if repeated:
             row["consistency"] = _ratio(sum(len({lvl for lvl, _ in p.repeats}) == 1 for p in repeated), len(repeated))
@@ -304,7 +316,8 @@ def failures_markdown(predictions: list[Prediction], rows: list[dict[str, Any]])
     lines = ["# Analisis kegagalan", "", f"Dibuat {now_local():%d-%m-%Y %H:%M} WITA.", "", "## Ringkasan metrik", ""]
     if rows:
         keys = ["variant", "n", "errors", "precision", "recall", "f1", "recall_any_alert", "false_alarm_fog", "false_alarm_sunset",
-                "false_alarm_lights", "false_alarm_normal", "consistency", "confidence_std_mean"]
+                "false_alarm_lights", "false_alarm_normal", "lookalike_named_right", "normal_called_lookalike",
+                "consistency", "confidence_std_mean"]
         keys = [k for k in keys if any(k in r for r in rows)]
         lines += ["| " + " | ".join(keys) + " |", "|" + "---|" * len(keys)]
         lines += ["| " + " | ".join("-" if r.get(k) is None else str(r.get(k)) for k in keys) + " |" for r in rows]
@@ -331,5 +344,13 @@ def failures_markdown(predictions: list[Prediction], rows: list[dict[str, Any]])
         if p.variant in ("v1", "v2"):
             by_file[p.file][p.variant] = p.level
     diffs = [(f, lv) for f, lv in by_file.items() if len(lv) == 2 and lv["v1"] != lv["v2"]]
-    lines += [f"- `{f}`: v1 {lv['v1']} · v2 {lv['v2']}" for f, lv in diffs] or ["Tidak ada perbedaan (atau hanya satu prompt diuji)."]
+    lines += [f"- `{f}`: v1 {lv['v1']} · v2 {lv['v2']}" for f, lv in diffs] or ["Keputusan v1 dan v2 sama untuk semua gambar (atau hanya satu prompt diuji)."]
+    labels: dict[str, dict[str, str]] = defaultdict(dict)
+    for p in predictions:
+        if p.variant in ("v1", "v2"):
+            labels[p.file][p.variant] = p.lookalike
+    label_diffs = [(f, lk) for f, lk in labels.items() if len(lk) == 2 and lk["v1"] != lk["v2"]]
+    if label_diffs:
+        lines += ["", "Perbedaan label lookalike (keputusan sama, cara model menamai berbeda):", ""]
+        lines += [f"- `{f}`: v1 `{lk['v1']}` · v2 `{lk['v2']}`" for f, lk in label_diffs]
     return "\n".join(lines) + "\n"
