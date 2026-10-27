@@ -9,6 +9,7 @@ from typing import Any
 from mataklabat.agent import IncidentAgent, IncidentReporter
 from mataklabat.alerts import AlertService
 from mataklabat.config import Settings, now_local
+from mataklabat.control import CameraControl, ControlWatcher
 from mataklabat.notifier import OutboxSender, TelegramClient
 from mataklabat.pipeline import ConsoleSink, Monitor
 from mataklabat.recorder import Recorder
@@ -80,7 +81,7 @@ class Housekeeper:
             if monitor.verifier is None:
                 self.storage.set_health("llm", None, "AI nonaktif (LLM_MODEL kosong atau --no-llm), memakai detektor lokal")
             else:
-                failing = [w.camera.id for w in monitor.workers if w._llm_failed]
+                failing = [w.camera.id for w in monitor.workers if w.active and w._llm_failed]
                 detail = f"{self.settings.llm_model} @ {self.settings.llm_base_url}"
                 if failing:
                     detail += f"; gagal untuk {', '.join(failing)}"
@@ -128,10 +129,14 @@ def build_monitor(settings: Settings, with_weather: bool = True, verifier=None) 
         telegram = TelegramClient(settings.telegram_bot_token, settings.telegram_chat_id)
     services: list[Any] = [alerts, reporter, OutboxSender(storage, telegram)]
 
-    recorder = Recorder(storage, snapshots, settings.cameras, listeners=[alerts])
+    recorder = Recorder(storage, snapshots, settings.cameras, listeners=[alerts, reporter])
+    control = ControlWatcher(CameraControl(settings.control_db_path, settings.cameras))
     monitor_ref: dict[str, Any] = {}
-    services.append(Housekeeper(settings, storage, snapshots, monitor_ref, risk))
-    monitor = Monitor(settings, sinks=[ConsoleSink(), recorder], verifier=verifier, risk=risk, services=services)
+    services += [control, Housekeeper(settings, storage, snapshots, monitor_ref, risk)]
+    monitor = Monitor(
+        settings, sinks=[ConsoleSink(), recorder], verifier=verifier, risk=risk, services=services,
+        is_enabled=control.enabled,
+    )
     monitor_ref["monitor"] = monitor
     monitor.storage = storage
     return monitor

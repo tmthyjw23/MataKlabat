@@ -1,0 +1,38 @@
+# systemd unit for MataKlabat (monitor + website through the built-in supervisor).
+# Install: see docs/DEPLOY.md. Replace USER and /home/USER/mataklabat if yours differ.
+[Unit]
+Description=MataKlabat - pemantauan karhutla Gunung Klabat
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=USER
+Group=USER
+WorkingDirectory=/home/USER/mataklabat
+# Settings come from /home/USER/mataklabat/.env (read by the app itself).
+ExecStart=/home/USER/mataklabat/.venv/bin/python -m mataklabat up
+Restart=always
+RestartSec=5
+# The supervisor stops monitor and web cleanly on SIGINT.
+KillSignal=SIGINT
+TimeoutStopSec=20
+Environment=PYTHONUNBUFFERED=1
+
+# Hardening: the app only writes under data/.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/USER/mataklabat/data
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# Shared small VPS: keep MataKlabat from starving other services.
+MemoryMax=800M
+CPUQuota=150%
+
+[Install]
+WantedBy=multi-user.target

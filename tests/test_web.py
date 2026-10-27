@@ -51,7 +51,7 @@ def test_status_summarises_cameras_risk_and_incidents(env):
     _, _, client, incident = env
     data = client.get("/api/status").json()
     assert data["monitor"]["alive"] is True
-    assert data["counts"] == {"normal": 0, "check": 0, "fire": 1, "offline": 1}
+    assert data["counts"] == {"normal": 0, "check": 0, "fire": 1, "offline": 1, "disabled": 0}
     cam1 = data["cameras"][0]
     assert cam1["label"] == "Kebakaran Terdeteksi" and cam1["snapshot_url"].startswith("/api/cameras/CAM-01/snapshot.jpg")
     assert data["cameras"][1]["mode"] == "foto" and data["cameras"][1]["online"] is False

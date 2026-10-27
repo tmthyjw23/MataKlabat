@@ -211,6 +211,10 @@ class IncidentReporter:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
+    def on_camera_disabled(self, camera_id: str) -> None:
+        """An operator reset: a new incident after re-enabling gets a full agent report."""
+        self._last_agent_run.pop(camera_id, None)
+
     def request(self, incident_id: int, decision: Decision, photo: Path | None = None) -> None:
         self._jobs.put((incident_id, decision))
 

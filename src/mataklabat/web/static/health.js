@@ -31,7 +31,7 @@ async function load() {
     return h("tr", null, h("td", { text: `${cam.id} · ${cam.name}` }),
       h("td", { text: cam.mode === "foto" ? "Kamera foto (folder)" : "Webcam / video / stream" }),
       h("td", null, badge(kind)),
-      h("td", { class: "muted", text: cam.online ? `frame terakhir ${fmtTime(cam.ts)}` : (cam.offline_reason || "") }));
+      h("td", { class: "muted", text: kind === "disabled" ? "dinonaktifkan operator" : cam.online ? `frame terakhir ${fmtTime(cam.ts)}` : (cam.offline_reason || "") }));
   }));
 
   const cfg = data.config;

@@ -9,6 +9,7 @@ const STATUS = {
   check: { label: "Perlu Dicek" },
   fire: { label: "Kebakaran Terdeteksi" },
   offline: { label: "Offline" },
+  disabled: { label: "Nonaktif" },
 };
 const SUB_STATUS = {
   unverified: "belum terverifikasi AI",
@@ -53,16 +54,18 @@ function svg(tag, attrs, ...children) {
 
 // Shape + color per status, so status is readable without color (Spec §10.4).
 function statusIcon(kind, size = 18, color) {
-  const fill = color || `var(--${kind === "offline" ? "offline" : kind})`;
+  const fill = color || `var(--${kind === "offline" || kind === "disabled" ? "offline" : kind})`;
   const icon = svg("svg", { width: size, height: size, viewBox: "0 0 22 22", "aria-hidden": "true", focusable: "false" });
   if (kind === "fire") icon.append(svg("path", { d: "M7 1h8l6 6v8l-6 6H7l-6-6V7Z", fill }));
   else if (kind === "check") icon.append(svg("path", { d: "M11 1 21 20H1Z", fill }));
   else if (kind === "normal") icon.append(svg("circle", { cx: 11, cy: 11, r: 10, fill }));
+  else if (kind === "disabled") icon.append(svg("rect", { x: 5, y: 3, width: 4, height: 16, fill }), svg("rect", { x: 13, y: 3, width: 4, height: 16, fill }));
   else icon.append(svg("circle", { cx: 11, cy: 11, r: 9, fill: "none", stroke: fill, "stroke-width": 2.5 }));
   return icon;
 }
 
 function cameraKind(cam) {
+  if (cam.enabled === false) return "disabled";
   if (!cam.online) return "offline";
   return KIND_BY_LEVEL[cam.level] || "normal";
 }
@@ -109,6 +112,24 @@ async function fetchJSON(url) {
   return resp.json();
 }
 
+// State-changing requests (operator only). The custom header is checked by the server.
+async function postJSON(url, body) {
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", "X-MataKlabat": "1" },
+    body: JSON.stringify(body || {}),
+    credentials: "same-origin",
+  });
+  let data = null;
+  try { data = await resp.json(); } catch (err) { data = null; }
+  if (!resp.ok) {
+    const error = new Error((data && data.error) || `HTTP ${resp.status}`);
+    error.status = resp.status;
+    throw error;
+  }
+  return data;
+}
+
 // Live updates: the server sends "update" whenever data changes; pages refetch.
 function connectLive(onUpdate) {
   const banner = document.getElementById("live-banner");
@@ -142,14 +163,15 @@ function showMonitorBanner(monitor) {
 function setHeaderPill(status) {
   const pill = document.getElementById("system-pill");
   if (!pill) return;
-  const total = status.cameras.length;
-  const online = status.cameras.filter((c) => c.online).length;
+  const active = status.cameras.filter((c) => c.enabled !== false);
+  const online = active.filter((c) => c.online).length;
+  const off = status.cameras.length - active.length;
   const parts = [
     status.monitor.alive ? "Monitor aktif" : "Monitor mati",
-    `${online}/${total} kamera online`,
+    `${online}/${active.length} kamera online${off ? ` · ${off} nonaktif` : ""}`,
     status.llm_enabled ? "AI aktif" : "AI nonaktif",
   ];
-  pill.classList.toggle("bad", !status.monitor.alive || online < total);
+  pill.classList.toggle("bad", !status.monitor.alive || online < active.length);
   replace(pill, h("span", { class: "dot", "aria-hidden": "true" }), parts.join(" · "));
 }
 

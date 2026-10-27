@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from mataklabat.camera import Frame
-from mataklabat.config import CameraConfig
+from mataklabat.config import CameraConfig, now_local
 from mataklabat.decision import Decision, Level
 from mataklabat.detector import LocalDetection
 from mataklabat.snapshots import SnapshotStore, annotate
@@ -28,6 +28,8 @@ class RecorderListener(Protocol):
     def on_level_change(self, decision: Decision, photo: Path | None) -> None: ...
 
     def on_sub_status_change(self, decision: Decision, photo: Path | None) -> None: ...
+
+    def on_camera_disabled(self, camera_id: str) -> None: ...
 
     def on_incident_opened(self, incident_id: int, decision: Decision, photo: Path | None) -> None: ...
 
@@ -110,6 +112,7 @@ class Recorder:
             )
 
         status: dict[str, Any] = {
+            "enabled": 1,
             "ts": decision.ts,
             "level": decision.level.value,
             "sub_status": decision.sub_status,
@@ -154,6 +157,45 @@ class Recorder:
             return
         self._offline.add(camera_id)
         self.storage.upsert_camera_status(camera_id, online=0, offline_reason=reason or "tidak ada frame")
+
+    def on_camera_enabled(self, camera_id: str) -> None:
+        self._sub_status.pop(camera_id, None)
+        self._last_event_at.pop(camera_id, None)
+        self.storage.upsert_camera_status(
+            camera_id, enabled=1, online=0, offline_reason="menyalakan kamera",
+            level=Level.AMAN.value, sub_status=None, rule=None, explanation=None,
+        )
+        self._operator_event(camera_id, "ON", "Kamera diaktifkan operator.")
+
+    def on_camera_disabled(self, camera_id: str, level_before: Level, at_start: bool) -> None:
+        """Reset to Normal: close the open incident and clear the shown status."""
+        ts = now_local()
+        incident_id = self.storage.open_incident_id(camera_id)
+        if incident_id is not None:
+            self.storage.close_incident(incident_id, ts, reason="kamera dinonaktifkan operator")
+            log.info("%s: insiden #%d ditutup (kamera dinonaktifkan).", camera_id, incident_id)
+        self._sub_status.pop(camera_id, None)
+        self._offline.discard(camera_id)
+        self.storage.upsert_camera_status(
+            camera_id, ts=ts, enabled=0, online=0, offline_reason=None,
+            level=Level.AMAN.value, sub_status=None, rule="OFF",
+            explanation="Kamera dinonaktifkan operator.", fire_score=None, smoke_score=None,
+        )
+        if not at_start:
+            text = "Kamera dinonaktifkan operator."
+            if level_before != Level.AMAN:
+                text += f" Status {level_before.label} di-reset ke Normal."
+            self._operator_event(camera_id, "OFF", text, level_before)
+        self._notify("on_camera_disabled", camera_id)
+
+    def _operator_event(self, camera_id: str, rule: str, text: str, level_from: Level = Level.AMAN) -> None:
+        trace = {"level_from": level_from.value, "level": Level.AMAN.value, "rule": rule,
+                 "explanation": text, "inputs": {}}
+        self.storage.insert_event(
+            ts=now_local(), camera_id=camera_id, level=Level.AMAN.value, sub_status=None,
+            fire_score=None, smoke_score=None, llm=None, risk_level=None, fwi=None,
+            rule=rule, trace=trace, snapshot_path=None,
+        )
 
     def _notify(self, method: str, *args: Any) -> None:
         for listener in self.listeners:

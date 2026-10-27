@@ -19,6 +19,7 @@
       <span class="pill" id="system-pill" role="status"><span class="dot" aria-hidden="true"></span>Memuat…</span>
       <span class="mono" id="clock"></span>
       <nav class="nav" aria-label="Halaman"><a href="/health">Kesehatan sistem</a></nav>
+      <button class="btn secondary small" id="operator-btn" type="button" hidden>Masuk operator</button>
     </div>
   </div>
 </header>
@@ -86,6 +87,32 @@
     </div>
   </section>
 </main>
+<dialog id="login-dialog" aria-labelledby="login-title">
+  <form class="dialog-form" id="login-form">
+    <h2 id="login-title">Masuk sebagai operator</h2>
+    <p class="small muted">Operator bisa mengaktifkan/menonaktifkan kamera dan memilih foto demo. Penonton tetap bisa melihat tanpa masuk.</p>
+    <label class="small" for="login-password">Password operator</label>
+    <input id="login-password" type="password" autocomplete="current-password" required>
+    <p class="form-error" id="login-error" role="alert"></p>
+    <div class="chips">
+      <button class="btn" type="submit">Masuk</button>
+      <button class="btn secondary" type="button" id="login-cancel">Batal</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="gallery-dialog" class="wide" aria-labelledby="gallery-title">
+  <div class="stack">
+    <div class="split">
+      <h2 id="gallery-title">Pilih foto</h2>
+      <button class="btn secondary small" type="button" id="gallery-close">Tutup</button>
+    </div>
+    <p class="small muted" id="gallery-note">Foto yang dipilih langsung tampil di kamera dan dicek AI.</p>
+    <p class="form-error" id="gallery-error" role="alert"></p>
+    <div class="gallery" id="gallery-grid"></div>
+  </div>
+</dialog>
+
 <footer>Prototipe akademik. Bukan pengganti sistem resmi BPBD, Manggala Agni, atau BMKG. Gambar kamera dapat berupa simulasi (video atau mode foto).</footer>
 
 <script src="/static/vendor/leaflet/leaflet.js"></script>

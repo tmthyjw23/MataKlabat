@@ -22,6 +22,9 @@ const mapView = new MapView(document.getElementById("map"));
 let refreshing = false;
 let pending = false;
 let filterFilled = false;
+const operator = { available: false, active: false, busy: new Set(), notes: {} };
+let lastCameras = [];
+let galleryCamera = null;
 
 function fact(label, value) {
   return h("div", { class: "fact" }, h("span", { class: "fact-label", text: label }), h("span", { class: "fact-value", text: value }));
@@ -93,8 +96,8 @@ async function renderRiskHistory() {
 }
 
 function renderCounts(counts) {
-  const order = [["fire", counts.fire], ["check", counts.check], ["normal", counts.normal], ["offline", counts.offline]];
-  replace(els.counts, ...order.filter(([kind, n]) => n > 0 || kind !== "offline").map(([kind, n]) =>
+  const order = [["fire", counts.fire], ["check", counts.check], ["normal", counts.normal], ["offline", counts.offline], ["disabled", counts.disabled || 0]];
+  replace(els.counts, ...order.filter(([kind, n]) => n > 0 || (kind !== "offline" && kind !== "disabled")).map(([kind, n]) =>
     h("div", { class: `count ${kind}` }, statusIcon(kind, 22), h("span", { class: "name", text: STATUS[kind].label }), h("span", { class: "n", text: n }))));
 }
 
@@ -108,11 +111,12 @@ async function renderIncident(status) {
   if (!open.length) {
     card.className = "card narrow stack incident none";
     const checking = status.cameras.filter((c) => cameraKind(c) === "check");
+    const active = status.cameras.filter((c) => c.enabled !== false);
     replace(card,
       h("h2", { text: "Tidak ada insiden aktif" }),
       h("p", { class: "muted", text: checking.length
         ? `${checking.length} kamera perlu dicek: ${checking.map((c) => c.id).join(", ")}.`
-        : "Semua kamera tidak menunjukkan api atau asap." }),
+        : active.length ? "Semua kamera aktif tidak menunjukkan api atau asap." : "Semua kamera sedang dinonaktifkan operator." }),
       h("a", { class: "btn secondary", href: "#history-title" }, "Lihat riwayat"),
     );
     return;
@@ -153,32 +157,206 @@ function outboxLabel(m) {
   return m.attempts ? `menunggu kirim ulang (${m.last_error || "gagal"})` : "dalam antrean";
 }
 
+function cameraNote(cam, kind) {
+  if (kind === "disabled") {
+    if (cam.pending) return "Mematikan kamera…";
+    const since = cam.control_ts ? `Dinonaktifkan operator sejak ${fmtTime(cam.control_ts).slice(0, 5)}` : "Nonaktif sejak sistem dinyalakan";
+    return `${since}. Tidak memakai AI dan tidak mengirim Telegram.`;
+  }
+  if (cam.pending) return "Menyalakan kamera…";
+  return cam.offline_reason || "Offline";
+}
+
+// The grid re-renders on every live update; the buttons are reused while their state
+// is unchanged, so a click that lands during a re-render is not lost.
+const actionCache = new Map();
+
+function currentCamera(id) {
+  return lastCameras.find((c) => c.id === id);
+}
+
+function operatorActions(cam) {
+  if (!operator.active) return null;
+  const busy = operator.busy.has(cam.id) || cam.pending;
+  const sig = JSON.stringify([cam.enabled, busy, operator.busy.has(cam.id), cam.mode]);
+  const cached = actionCache.get(cam.id);
+  if (cached && cached.sig === sig) return cached.node;
+  const id = cam.id;
+  const toggle = h("button", {
+    class: `btn small${cam.enabled ? " secondary" : ""}`, type: "button", disabled: busy,
+    "aria-pressed": cam.enabled ? "true" : "false",
+    onclick: () => toggleCamera(currentCamera(id)),
+  }, cam.enabled ? "Nonaktifkan" : "Aktifkan");
+  const pick = cam.mode === "foto"
+    ? h("button", { class: "btn small secondary", type: "button", disabled: operator.busy.has(id), onclick: () => openGallery(currentCamera(id)) }, "Pilih foto")
+    : null;
+  const node = h("div", { class: "cam-actions" }, toggle, pick);
+  actionCache.set(id, { sig, node });
+  return node;
+}
+
 function renderCameras(cameras) {
+  lastCameras = cameras;
   replace(els.grid, ...cameras.map((cam) => {
     const kind = cameraKind(cam);
     const sub = cam.sub_status && cam.online ? SUB_STATUS[cam.sub_status] || cam.sub_status : null;
-    return h("article", { class: `cam-card${kind === "offline" ? " offline" : ""}` },
-      photo(cam.snapshot_url, `Gambar terbaru ${cam.id}`, cam.online ? "Belum ada gambar" : (cam.offline_reason || "Offline")),
+    const dim = kind === "offline" || kind === "disabled";
+    return h("article", { class: `cam-card${dim ? ` ${kind}` : ""}` },
+      photo(kind === "disabled" ? null : cam.snapshot_url, `Gambar terbaru ${cam.id}`,
+        kind === "disabled" ? "Kamera nonaktif" : cam.online ? "Belum ada gambar" : cameraNote(cam, kind)),
       h("div", { class: "cam-body" },
         h("div", { class: "cam-head" }, h("strong", { text: cam.id }), badge(kind)),
         h("span", { class: "muted", text: cam.name }),
         h("div", { class: "chips" },
           cam.mode === "foto" ? h("span", { class: "tag", text: "Mode foto (simulasi)" }) : null,
+          cam.photo_shown && operator.active ? h("span", { class: "tag", text: `Foto: ${cam.photo_shown}` }) : null,
           sub ? h("span", { class: "tag", text: sub }) : null),
         cam.online
           ? h("span", { class: "cam-scores", text: `api ${num(cam.fire_score)} · asap ${num(cam.smoke_score)} · cek AI ${cam.last_llm_ts ? fmtTime(cam.last_llm_ts).slice(0, 5) : "-"}` })
-          : h("span", { class: "small muted", text: cam.offline_reason || "Offline" }),
+          : h("span", { class: "small muted", text: cameraNote(cam, kind) }),
         cam.online && kind !== "normal" && cam.explanation ? h("span", { class: "small", text: cam.explanation }) : null,
+        operator.notes[cam.id] ? h("span", { class: "small", role: "status", text: operator.notes[cam.id] }) : null,
+        operatorActions(cam),
       ));
   }));
 }
+
+// --- operator --------------------------------------------------------------------------------
+
+const opEls = {
+  button: document.getElementById("operator-btn"),
+  login: document.getElementById("login-dialog"),
+  form: document.getElementById("login-form"),
+  password: document.getElementById("login-password"),
+  loginError: document.getElementById("login-error"),
+  gallery: document.getElementById("gallery-dialog"),
+  galleryGrid: document.getElementById("gallery-grid"),
+  galleryTitle: document.getElementById("gallery-title"),
+  galleryError: document.getElementById("gallery-error"),
+};
+
+function renderOperatorButton() {
+  opEls.button.hidden = !operator.available;
+  opEls.button.textContent = operator.active ? "Operator · Keluar" : "Masuk operator";
+}
+
+async function loadSession() {
+  try {
+    const data = await fetchJSON("/api/session");
+    operator.available = data.available;
+    operator.active = data.operator;
+  } catch (err) {
+    operator.available = false;
+  }
+  renderOperatorButton();
+}
+
+function sessionExpired() {
+  operator.active = false;
+  renderOperatorButton();
+  refresh();
+}
+
+async function toggleCamera(cam) {
+  const turnOff = cam.enabled;
+  if (turnOff && cam.level !== "AMAN" && cam.online) {
+    const incident = cam.level === "BAHAYA" ? " dan menutup insidennya" : "";
+    const sure = window.confirm(`${cam.id} sedang ${STATUS[cameraKind(cam)].label}. Menonaktifkan akan me-reset status ke Normal${incident}. Lanjutkan?`);
+    if (!sure) return;
+  }
+  operator.busy.add(cam.id);
+  delete operator.notes[cam.id];
+  renderCameras(lastCameras);
+  try {
+    await postJSON(`/api/cameras/${encodeURIComponent(cam.id)}/enabled`, { enabled: !turnOff });
+  } catch (err) {
+    if (err.status === 401) sessionExpired();
+    else operator.notes[cam.id] = `Gagal mengubah ${cam.id}: ${err.message}`;
+  } finally {
+    operator.busy.delete(cam.id);
+    refresh();
+  }
+}
+
+async function openGallery(cam) {
+  galleryCamera = cam;
+  opEls.galleryTitle.textContent = `Pilih foto untuk ${cam.id}`;
+  opEls.galleryError.textContent = "";
+  replace(opEls.galleryGrid, h("p", { class: "small muted", text: "Memuat galeri…" }));
+  opEls.gallery.showModal();
+  try {
+    const photos = await fetchJSON("/api/gallery");
+    if (!photos.length) {
+      replace(opEls.galleryGrid, h("p", { class: "small muted", text: "Galeri kosong. Isi folder GALLERY_DIR (default data/demo/bahan)." }));
+      return;
+    }
+    replace(opEls.galleryGrid, ...photos.map((p) => h("button", {
+      type: "button", "aria-current": cam.photo_shown === p.name ? "true" : "false",
+      onclick: () => choosePhoto(p.name),
+    }, h("img", { src: p.thumb_url, alt: "", loading: "lazy" }), p.name)));
+  } catch (err) {
+    opEls.galleryError.textContent = "Galeri tidak bisa dimuat. Coba masuk ulang sebagai operator.";
+  }
+}
+
+async function choosePhoto(name) {
+  const cam = galleryCamera;
+  if (!cam) return;
+  operator.busy.add(cam.id);
+  try {
+    await postJSON(`/api/cameras/${encodeURIComponent(cam.id)}/photo`, { name });
+    opEls.gallery.close();
+    operator.notes[cam.id] = cam.enabled
+      ? `Foto ${name} dipilih; tampil dan dicek dalam beberapa detik.`
+      : `Foto ${name} disiapkan. Aktifkan ${cam.id} untuk mulai memeriksa.`;
+  } catch (err) {
+    if (err.status === 401) { opEls.gallery.close(); sessionExpired(); }
+    else opEls.galleryError.textContent = `Gagal: ${err.message}`;
+  } finally {
+    operator.busy.delete(cam.id);
+    refresh();
+  }
+}
+
+opEls.button.addEventListener("click", async () => {
+  if (operator.active) {
+    try { await postJSON("/api/logout"); } catch (err) { /* already logged out */ }
+    operator.active = false;
+    renderOperatorButton();
+    refresh();
+    return;
+  }
+  opEls.loginError.textContent = "";
+  opEls.password.value = "";
+  opEls.login.showModal();
+  opEls.password.focus();
+});
+
+opEls.form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  opEls.loginError.textContent = "";
+  try {
+    await postJSON("/api/login", { password: opEls.password.value });
+    opEls.password.value = "";
+    opEls.login.close();
+    operator.active = true;
+    renderOperatorButton();
+    refresh();
+  } catch (err) {
+    opEls.loginError.textContent = err.message;
+    opEls.password.select();
+  }
+});
+
+document.getElementById("login-cancel").addEventListener("click", () => opEls.login.close());
+document.getElementById("gallery-close").addEventListener("click", () => opEls.gallery.close());
 
 function renderHistory(events, cameras) {
   if (!filterFilled) {
     for (const cam of cameras) els.historyFilter.append(h("option", { value: cam.id, text: cam.id }));
     filterFilled = true;
   }
-  const changes = events.filter((e) => e.level_from !== e.level || e.llm);
+  const changes = events.filter((e) => e.level_from !== e.level || e.llm || e.rule === "ON" || e.rule === "OFF");
   if (!changes.length) {
     replace(els.historyBody, h("tr", null, h("td", { colspan: 5, class: "muted", text: "Belum ada perubahan status atau cek AI dalam 30 menit terakhir." })));
     return;
@@ -230,7 +408,7 @@ async function loadHotspots() {
 els.historyFilter.addEventListener("change", refresh);
 fetchJSON("/api/map").then((data) => mapView.setStatic(data)).catch(() => {});
 startClock();
-refresh();
+loadSession().then(refresh);
 renderRiskHistory();
 loadHotspots();
 setInterval(renderRiskHistory, 600000);

@@ -23,7 +23,7 @@ function render(d) {
       h("div", { class: "chips" }, open ? badge("fire") : h("span", { class: "tag", text: "Selesai" }),
         h("span", { class: "small muted", text: `Insiden #${d.id}` })),
       h("h1", { text: `${d.camera_id} · ${d.camera_name}` }),
-      h("p", { class: "muted", text: `Dibuka ${fmtDateTime(d.opened_ts)}${d.closed_ts ? ` · ditutup ${fmtDateTime(d.closed_ts)}` : " · masih berlangsung"}` }),
+      h("p", { class: "muted", text: `Dibuka ${fmtDateTime(d.opened_ts)}${d.closed_ts ? ` · ditutup ${fmtDateTime(d.closed_ts)}${d.close_reason ? ` (${d.close_reason})` : ""}` : " · masih berlangsung"}` }),
       photos.length
         ? h("div", { class: "thumbs" }, ...photos.slice(-8).map((e) =>
             h("figure", null, h("img", { src: e.snapshot_url, alt: `Foto ${fmtTime(e.ts)} (${e.label})`, loading: "lazy" }),

@@ -174,7 +174,10 @@ def morning_summary(risk: dict | None, cameras: list[dict], when: datetime, publ
         lines.append("Risiko kawasan: tidak diketahui (data cuaca belum tersedia).")
     lines += ["", "Status kamera:"]
     for cam in cameras:
-        state = status_label(cam["level"]) if cam.get("online") else "Offline"
+        if cam.get("enabled", 1) == 0:
+            state = "Nonaktif (pilihan operator)"
+        else:
+            state = status_label(cam["level"]) if cam.get("online") else "Offline"
         lines.append(f"• {cam['camera_id']} {cam.get('name') or ''}: {state}")
     lines += _footer(public_url)
     return fit("\n".join(lines), MESSAGE_LIMIT)

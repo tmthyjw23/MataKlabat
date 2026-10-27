@@ -1,4 +1,5 @@
-opencv-python>=4.9
+# headless: tanpa jendela GUI (tidak dipakai), jalan di server tanpa libGL; webcam tetap bisa
+opencv-python-headless>=4.9
 numpy>=1.26
 # openai: klien untuk endpoint OpenAI-compatible (9router)
 openai>=1.40

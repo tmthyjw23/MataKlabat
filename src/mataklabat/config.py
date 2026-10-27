@@ -48,6 +48,7 @@ class CameraConfig:
     lon: float
     facing_deg: float = 0.0
     mode: str = "live"  # "live" (webcam/video/stream) or "foto" (newest photo in a folder)
+    enabled: bool = True  # starting state before an operator turns the camera on or off
 
     @property
     def is_photo(self) -> bool:
@@ -101,6 +102,8 @@ class Settings:
     morning_summary_at: str = "07:00"  # HH:MM WITA, empty = off
     public_url: str | None = None  # link added to Telegram messages when set
     web_host: str = "127.0.0.1"
+    operator_password: str | None = field(default=None, repr=False)  # empty = no operator controls
+    gallery_dir: Path | None = None  # demo photos an operator can show on a photo camera
 
     # Pipeline pacing
     process_fps: float = 2.0
@@ -150,6 +153,11 @@ class Settings:
         return self.runtime_dir / "snapshots"
 
     @property
+    def control_db_path(self) -> Path:
+        """Operator choices (camera on/off). Written only by the web, read by the monitor."""
+        return self.runtime_dir / "control.db"
+
+    @property
     def risk_point(self) -> tuple[float, float]:
         """Where area weather is taken: `weather_point` from resources.yaml, else the first
         reference point, else the first camera."""
@@ -180,7 +188,8 @@ def load_settings(
         if env_path.is_file():
             load_dotenv(env_path, override=False)
 
-    cameras = _load_cameras(root / "config" / "cameras.yaml", root)
+    cameras_file = _env_str("CAMERAS_FILE") or "config/cameras.yaml"
+    cameras = _load_cameras(_under_root(root, cameras_file), root)
     resources = _load_resources(root / "config" / "resources.yaml")
 
     llm_model = _env_str("LLM_MODEL")
@@ -197,6 +206,7 @@ def load_settings(
         )
 
     yolo = _env_str("YOLO_WEIGHTS")
+    gallery = _env_str("GALLERY_DIR") or "data/demo/bahan"
     settings = Settings(
         root=root,
         cameras=cameras,
@@ -213,11 +223,18 @@ def load_settings(
         morning_summary_at=_morning_summary(),
         public_url=_env_str("PUBLIC_URL"),
         web_host=_env_str("WEB_HOST") or "127.0.0.1",
+        operator_password=_env_str("OPERATOR_PASSWORD"),
+        gallery_dir=_under_root(root, gallery),
         yolo_weights=Path(yolo) if yolo else None,
         **_numeric_overrides(),
     )
     _validate(settings)
     return settings
+
+
+def _under_root(root: Path, value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else root / path
 
 
 def _morning_summary() -> str:
@@ -275,6 +292,8 @@ def _validate(s: Settings) -> None:
         problems.append("CONFIRM_MIN harus di antara 1 dan CONFIRM_WINDOW")
     if s.clear_steps < 1:
         problems.append("CLEAR_STEPS minimal 1")
+    if s.operator_password is not None and len(s.operator_password) < 10:
+        problems.append("OPERATOR_PASSWORD minimal 10 karakter")
     if problems:
         raise ConfigError("Konstanta tidak valid: " + "; ".join(problems) + ".")
 
@@ -337,6 +356,9 @@ def _load_cameras(path: Path, root: Path) -> tuple[CameraConfig, ...]:
         if mode not in (MODE_LIVE, MODE_PHOTO):
             raise ConfigError(f"{where}: 'mode' harus '{MODE_LIVE}' atau '{MODE_PHOTO}', bukan {mode!r}.")
         source = _parse_source(item["source"], root, where)
+        enabled = item.get("enabled", True)
+        if not isinstance(enabled, bool):
+            raise ConfigError(f"{where}: 'enabled' harus true atau false, bukan {enabled!r}.")
         if mode == MODE_PHOTO and not isinstance(source, str):
             raise ConfigError(f"{where}: kamera mode foto butuh 'source' berupa path folder.")
         cameras.append(
@@ -348,6 +370,7 @@ def _load_cameras(path: Path, root: Path) -> tuple[CameraConfig, ...]:
                 lon=_number(item, "lon", where, -180, 180),
                 facing_deg=_number({"facing_deg": facing}, "facing_deg", where, 0, 360) % 360,
                 mode=mode,
+                enabled=enabled,
             )
         )
     return tuple(cameras)

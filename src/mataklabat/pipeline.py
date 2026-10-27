@@ -54,7 +54,11 @@ class LLMScheduler:
 
 
 class DecisionSink(Protocol):
-    """Receives every decision a worker makes (console, storage, ...)."""
+    """Receives every decision a worker makes (console, storage, ...).
+
+    Sinks may also have on_camera_enabled(camera_id) and
+    on_camera_disabled(camera_id, level_before, at_start) for operator on/off.
+    """
 
     def on_decision(self, decision: Decision, local: LocalDetection, frame: Frame) -> None: ...
 
@@ -105,6 +109,16 @@ class ConsoleSink:
             self._offline.add(camera_id)
             log.error("%s OFFLINE: %s", camera_id, reason or "tidak ada frame")
 
+    def on_camera_enabled(self, camera_id: str) -> None:
+        log.warning("%s diaktifkan operator.", camera_id)
+
+    def on_camera_disabled(self, camera_id: str, level_before: Level, at_start: bool) -> None:
+        self._offline.discard(camera_id)
+        if at_start:
+            log.info("%s nonaktif (pilihan operator).", camera_id)
+        else:
+            log.warning("%s dinonaktifkan operator (status sebelumnya %s).", camera_id, level_before.label)
+
 
 class CameraWorker(threading.Thread):
     def __init__(
@@ -118,6 +132,7 @@ class CameraWorker(threading.Thread):
         scheduler: LLMScheduler | None = None,
         clock: Callable[[], float] = time.monotonic,
         risk: RiskService | None = None,
+        is_enabled: Callable[[str], bool] | None = None,
     ):
         super().__init__(name=f"worker-{camera.id}", daemon=True)
         self.camera = camera
@@ -125,8 +140,11 @@ class CameraWorker(threading.Thread):
         self.sinks = sinks
         self.stop_event = stop_event
         self.source = open_source(camera)
+        self.detector_factory = detector_factory
         self.detector = detector_factory(settings, camera)
         self.engine = DecisionEngine(camera.id, settings)
+        self.is_enabled = is_enabled or (lambda camera_id: True)
+        self.active: bool | None = None  # None until the first on/off check in run()
         self.verifier = verifier if settings.llm_enabled else None
         self.scheduler = scheduler
         self.risk = risk
@@ -147,10 +165,14 @@ class CameraWorker(threading.Thread):
     def run(self) -> None:
         interval = 1.0 / self.settings.process_fps
         last_seq = -1
-        self.source.start()
         try:
             while not self.stop_event.is_set():
                 started = time.monotonic()
+                if self.sync_enabled():
+                    last_seq = -1
+                if not self.active:
+                    self.stop_event.wait(interval)
+                    continue
                 frame = self.source.latest()
                 if frame is None:
                     if not self.source.online and self.source.last_error is not None:
@@ -166,6 +188,51 @@ class CameraWorker(threading.Thread):
             if self.scheduler is not None:
                 self.scheduler.withdraw(self.camera.id)
             self.source.stop()
+
+    def sync_enabled(self) -> bool:
+        """Follow the operator choice (on/off). Returns True when the state changed."""
+        wanted = bool(self.is_enabled(self.camera.id))
+        if wanted == self.active:
+            return False
+        first = self.active is None
+        if wanted:
+            self._activate(fresh=first)
+        else:
+            self._deactivate(at_start=first)
+        return True
+
+    def _activate(self, fresh: bool) -> None:
+        if not fresh:
+            # A clean start: new source, detector (motion background) and decision state.
+            self.source = open_source(self.camera)
+            self.detector = self.detector_factory(self.settings, self.camera)
+        self.source.start()
+        self.active = True
+        if not fresh:
+            self._notify("on_camera_enabled", self.camera.id)
+
+    def _deactivate(self, at_start: bool) -> None:
+        level_before = self.engine.level
+        self.source.stop()
+        if self.scheduler is not None:
+            self.scheduler.withdraw(self.camera.id)
+        self.engine = DecisionEngine(self.camera.id, self.settings)
+        self._last_llm_at = None
+        self._llm_failed = False
+        self._last_still_checked = None
+        self.last_decision = None
+        self.active = False
+        self._notify("on_camera_disabled", self.camera.id, level_before, at_start)
+
+    def _notify(self, method: str, *args) -> None:
+        for sink in self.sinks:
+            handler = getattr(sink, method, None)
+            if handler is None:
+                continue
+            try:
+                handler(*args)
+            except Exception:
+                log.exception("%s: sink %s.%s gagal.", self.camera.id, type(sink).__name__, method)
 
     def step(self, frame: Frame) -> Decision:
         local = self.detector.detect(frame)
@@ -251,6 +318,7 @@ class Monitor:
         verifier: VisionVerifier | None = None,
         risk: RiskService | None = None,
         services: list | None = None,
+        is_enabled: Callable[[str], bool] | None = None,
     ):
         self.settings = settings
         self.risk = risk
@@ -264,7 +332,7 @@ class Monitor:
         self.workers = [
             CameraWorker(
                 cam, settings, self.sinks, self.stop_event,
-                verifier=verifier, scheduler=scheduler, risk=risk,
+                verifier=verifier, scheduler=scheduler, risk=risk, is_enabled=is_enabled,
             )
             for cam in settings.cameras
         ]
@@ -292,7 +360,8 @@ class Monitor:
     def run_forever(self, duration_s: float | None = None) -> None:
         """Block until Ctrl+C, or until `duration_s` seconds have passed."""
         self.start()
-        log.info("Pemantauan berjalan untuk %d kamera. Tekan Ctrl+C untuk berhenti.", len(self.workers))
+        log.info("Pemantauan berjalan untuk %d kamera (yang nonaktif menunggu operator). "
+                 "Tekan Ctrl+C untuk berhenti.", len(self.workers))
         deadline = time.monotonic() + duration_s if duration_s else None
         try:
             # Short waits keep the main thread responsive to Ctrl+C on Windows.

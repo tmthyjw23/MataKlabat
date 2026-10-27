@@ -1,4 +1,5 @@
-"""SQLite storage (Spec §11). The monitor is the only writer; the web only reads.
+"""SQLite storage (Spec §11). The monitor is the only writer of events.db; the web
+only reads it. Operator choices live in a separate control.db (see control.py).
 
 All timestamps are ISO-8601 strings in Asia/Makassar (+08:00), so they sort and
 compare correctly as text.
@@ -47,7 +48,8 @@ CREATE TABLE IF NOT EXISTS incidents (
   report_source TEXT,
   alert_sent INTEGER DEFAULT 0,
   alert_outbox_id INTEGER,
-  report_outbox_id INTEGER
+  report_outbox_id INTEGER,
+  close_reason TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_incidents_open ON incidents(closed_ts);
 
@@ -66,7 +68,8 @@ CREATE TABLE IF NOT EXISTS camera_status (
   last_reasoning TEXT,
   last_llm_ts TEXT,
   online INTEGER NOT NULL DEFAULT 0,
-  offline_reason TEXT
+  offline_reason TEXT,
+  enabled INTEGER NOT NULL DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS risk_daily (
@@ -108,6 +111,12 @@ CREATE TABLE IF NOT EXISTS component_health (
 );
 """
 
+# Columns added after the first release; older databases get them on start.
+MIGRATIONS = (
+    ("camera_status", "enabled", "INTEGER NOT NULL DEFAULT 1"),
+    ("incidents", "close_reason", "TEXT"),
+)
+
 OUTBOX_PENDING = "pending"
 OUTBOX_SENT = "sent"
 OUTBOX_FAILED = "failed"
@@ -140,6 +149,10 @@ class Storage:
         self._lock = threading.Lock()
         with self._tx() as c:
             c.executescript(SCHEMA)
+            for table, column, decl in MIGRATIONS:
+                have = {r["name"] for r in c.execute(f"PRAGMA table_info({table})")}
+                if column not in have:
+                    c.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
 
     def close(self) -> None:
         with self._lock:
@@ -217,9 +230,9 @@ class Storage:
             ).fetchone()
         return None if row is None else int(row["id"])
 
-    def close_incident(self, incident_id: int, ts: datetime) -> None:
+    def close_incident(self, incident_id: int, ts: datetime, reason: str | None = None) -> None:
         with self._tx() as c:
-            c.execute("UPDATE incidents SET closed_ts=? WHERE id=?", (iso(ts), incident_id))
+            c.execute("UPDATE incidents SET closed_ts=?, close_reason=? WHERE id=?", (iso(ts), reason, incident_id))
 
     def update_incident(self, incident_id: int, **fields: Any) -> None:
         sets = ", ".join(f"{k}=?" for k in fields)

@@ -122,6 +122,11 @@ class AlertService:
             camera_id=camera.id, incident_id=incident_id,
         )
 
+    def on_camera_disabled(self, camera_id: str) -> None:
+        """An operator reset: the next rise at this camera alerts again right away."""
+        self._held_unverified.discard(camera_id)
+        self._last_check_alert.pop(camera_id, None)
+
     def on_incident_closed(self, incident_id: int, decision: Decision) -> None:
         log.info("%s: insiden #%d selesai (kembali Normal).", decision.camera_id, incident_id)
 

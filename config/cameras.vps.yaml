@@ -1,0 +1,37 @@
+# Kamera untuk server/VPS (dipilih dengan CAMERAS_FILE=config/cameras.vps.yaml di .env).
+# Server tidak punya webcam, jadi semua sumber berupa video atau folder foto.
+# enabled: false = kamera mulai NONAKTIF; operator mengaktifkannya dari dashboard saat demo.
+# Setelah operator memilih, pilihan itu disimpan (data/runtime/control.db) dan bertahan saat restart.
+# Lokasi kamera HIPOTETIS, sama seperti config/cameras.yaml.
+cameras:
+  - id: CAM-01
+    name: "Monumen Kaki Dian (Airmadidi)"
+    # Video kebakaran hutan (Pexels): saat diaktifkan, contoh Kebakaran Terdeteksi dari video.
+    source: "data/videos/fire_forest.mp4"
+    lat: 1.4205
+    lon: 124.9850
+    facing_deg: 55
+    enabled: false
+  - id: CAM-02
+    name: "Jalur Pendakian Klabat - Pos 1"
+    source: "data/videos/cam02.mp4"
+    lat: 1.4420
+    lon: 125.0050
+    facing_deg: 67
+    enabled: false
+  - id: CAM-03
+    name: "Desa Tatelu"
+    source: "data/videos/cam03.mp4"
+    lat: 1.52690
+    lon: 124.99247
+    facing_deg: 152
+    enabled: false
+  - id: CAM-04
+    name: "Matungkas - Laikit"
+    # Kamera Foto: operator memilih foto dari galeri (GALLERY_DIR) lewat dashboard.
+    source: "data/demo/CAM-04"
+    mode: foto
+    lat: 1.48209
+    lon: 124.97276
+    facing_deg: 116
+    enabled: false
