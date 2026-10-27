@@ -33,6 +33,7 @@ python3.11 -m venv .venv
 .venv/bin/python -m pip install --upgrade pip
 .venv/bin/python -m pip install -e .
 .venv/bin/python scripts/fetch_media.py      # video demo, foto galeri, test set (beberapa menit)
+cp data/demo/bahan/klabat.jpg data/demo/CAM-04/00_klabat_normal.jpg   # foto awal Kamera Foto
 ```
 
 OpenCV yang dipakai adalah versi *headless*, jadi tidak butuh libGL/desktop di server.
