@@ -12,13 +12,21 @@ Susunan kamera demo (Spec §5.3): **CAM-01 webcam**, **CAM-02 dan CAM-03 video s
 |---|---|---|---|
 | 0–2 | **Masalah nyata** | Kronologi karhutla Klabat Sep–Okt 2026 (60 → 651 ha, 21+ hari), Fishbone (`docs/RCA.md`) | RCA |
 | 2–3 | **Pencegahan** | Dashboard: Risiko Kawasan dari cuaca hari ini, penentunya (kekeringan / mudah menyala / sulit dipadamkan), prakiraan 3 hari, riwayat 30 hari | Data & analisis |
-| 3–5 | **Api muncul** | Seret **foto asap/api** ke folder CAM-04 → Perlu Dicek → Kebakaran Terdeteksi. Pesan Telegram masuk ke HP (foto + alasan + data). Buka panel **"Mengapa?"** | LLM, XAI |
-| 5–6 | **AI Agent** | Laporan insiden masuk sebagai pesan kedua: arah sebaran, desa terancam, rekomendasi. Buka halaman detail insiden + jejak keputusan | AI Agent |
-| 6–8 | **AI bisa salah** | (a) Seret **foto kabut gunung**: AI menolak sebagai lookalike (R5) atau tertipu (F1). (b) **Foto senja**. (c) **Foto orang membakar sampah** → Perlu Dicek (potensi): sisi pencegahan | Analisis kegagalan |
+| 3–4 | **AI tidak mudah tertipu** | Seret **foto kabut gunung** (`kabut_gunung.jpg`) ke CAM-04: detektor lokal curiga, AI menilai "mirip kabut/awan", status tetap **Normal**. Lanjut **foto senja** (`sunset_gunung.jpg`). Buka panel kamera: alasan AI tertulis | Lookalike, XAI |
+| 4–5 | **Pencegahan** | Seret foto **api unggun / orang mulai membakar** → **Perlu Dicek (potensi)** + pesan Telegram "belum pasti". Catatan: foto pembakaran sampah yang berasap tebal dinilai AI sebagai kebakaran sungguhan | Pencegahan |
+| 5–7 | **Api muncul** | Seret **foto kolom asap** (`asap_kolom.jpg` atau `asap_lereng.jpg`) → **Kebakaran Terdeteksi** dalam ±35 dtk. Telegram: foto + alasan + data (±40 dtk), lalu laporan AI Agent (±1 menit). Buka panel **"Mengapa?"** dan halaman insiden | LLM, AI Agent, XAI |
+| 7–8 | **AI bisa salah** | Tunjukkan `results/failures.md` dan keterbatasan: test set mudah, kasus asap tipis/malam belum teruji; label lookalike bisa berubah antar-ulangan | Analisis kegagalan |
 | 8–9 | **Evaluasi** | Tabel `results/metrics.csv`, confusion matrix, v1 vs v2, konsistensi (`results/failures.md`) | Evaluasi & prompt |
 | 9–10 | **Rekomendasi** | Rekomendasi untuk BPBD Minut, Dinas Kehutanan, desa (RCA §6); keterbatasan dan roadmap | Rekomendasi |
 
 Opsional: arahkan **video** api di HP ke webcam CAM-01 untuk menunjukkan kamera live. Pakai video, bukan foto: foto yang dipegang tangan menghasilkan gerak acak yang tidak bisa diandalkan.
+
+### Hal yang perlu diingat (hasil gladi 27 Okt 2026)
+- **Urutan penting:** kabut → potensi → api. Setelah Kebakaran Terdeteksi, kamera butuh ±4–5 menit (4 verifikasi AI bersih per level) untuk kembali ke Normal, jadi api diletakkan terakhir.
+- **Satu kejadian api per kamera per 10 menit:** laporan kedua dalam 10 menit memakai template (cooldown AI Agent), dan label laporannya menyebut alasan itu.
+- **Waktu:** satu cek AI ±15 dtk lewat 9router. Jeda bicara ±30 dtk setelah menyeret foto.
+- **9router harus tetap berjalan** di terminal WSL selama demo; cek `http://localhost:20128` sebelum mulai.
+- Untuk mengulang dari awal: hentikan `up`, hapus `data/runtime/`, kosongkan `data/demo/CAM-04/` kecuali satu foto normal.
 
 ### Kalimat kunci
 - *"Satelit buta saat berawan. Kamera darat tidak."*

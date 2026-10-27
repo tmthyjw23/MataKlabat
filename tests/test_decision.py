@@ -264,3 +264,19 @@ def test_trace_includes_llm_inputs(engine):
         "hazard_type": "smoke", "confidence": 0.86, "lookalike": "none", "prompt": "v2",
     }
     assert d.verdict is not None and d.verdict.confidence == 0.86
+
+
+def test_clean_verdict_with_lookalike_is_explained(engine):
+    fog = v(0.95, smoke=False, hazard="none", lookalike="fog_cloud")
+    d = step(engine, fog)
+    assert d.rule == "R0" and "mirip kabut/awan" in d.explanation
+    later = step(engine, None, scores=HIT)  # frames without a new verdict keep the AI's reason
+    assert later.explanation == d.explanation
+
+
+def test_r6_hold_steps_are_not_prefixed_twice(engine):
+    step(engine, v(0.95))
+    step(engine, v(0.9, smoke=False, hazard="none", lookalike="fog_cloud"))
+    d = step(engine, None)
+    assert d.rule == "R6" and not d.explanation.startswith("Masih berlaku")
+    assert "1/4 verifikasi AI bersih" in d.explanation and "mirip kabut/awan" in d.explanation

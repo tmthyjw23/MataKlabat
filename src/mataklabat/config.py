@@ -75,6 +75,7 @@ class Resources:
     villages: tuple[Place, ...] = ()
     resources: tuple[Resource, ...] = ()
     reference_points: tuple[Place, ...] = ()
+    weather_point: Place | None = None  # where area weather is taken (lower slopes, not the summit)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -150,7 +151,11 @@ class Settings:
 
     @property
     def risk_point(self) -> tuple[float, float]:
-        """Where area weather is taken: the first reference point (Puncak Klabat), else the first camera."""
+        """Where area weather is taken: `weather_point` from resources.yaml, else the first
+        reference point, else the first camera."""
+        if self.resources.weather_point is not None:
+            wp = self.resources.weather_point
+            return wp.lat, wp.lon
         if self.resources.reference_points:
             ref = self.resources.reference_points[0]
             return ref.lat, ref.lon
@@ -388,4 +393,12 @@ def _load_resources(path: Path) -> Resources:
                 contact=str(item.get("contact") or "ISI_SENDIRI"),
             )
         )
-    return Resources(villages=villages, resources=tuple(resources), reference_points=refs)
+    weather = data.get("weather_point")
+    if weather is not None and not isinstance(weather, dict):
+        raise ConfigError(f"{path.name}: 'weather_point' harus berupa mapping (name, lat, lon).")
+    return Resources(
+        villages=villages,
+        resources=tuple(resources),
+        reference_points=refs,
+        weather_point=None if weather is None else place(weather, f"{path.name} weather_point"),
+    )

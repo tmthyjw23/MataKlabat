@@ -11,5 +11,8 @@ resources:
   - {name: "Puskesmas Airmadidi",   kind: puskesmas, lat: 1.42634, lon: 124.97815, contact: "ISI_SENDIRI"}   # OSM amenity/clinic
   - {name: "Kantor Bupati Minahasa Utara", kind: pemda, lat: 1.45892, lon: 124.97471, contact: "ISI_SENDIRI"}   # way/526100332
   - {name: "Posko BPBD Minahasa Utara", kind: posko, lat: 1.4190, lon: 124.9830, contact: "ISI_SENDIRI"}   # PERKIRAAN: tidak ada di OSM
+# Titik pengambilan cuaca untuk Risiko Kawasan. Sengaja di kaki gunung (tempat kebakaran 2026
+# bermula), bukan di puncak (±2.000 m), yang jauh lebih dingin dan lembap.
+weather_point: {name: "Airmadidi (kaki Klabat)", lat: 1.42749, lon: 124.98029}   # node/976686562
 reference_points:
   - {name: "Puncak Klabat", lat: 1.45304, lon: 125.03121}   # node/1070159421 (natural/peak)

@@ -134,6 +134,7 @@ class DecisionEngine:
         self._clear_steps = 0
         self._last_observed: LocalDetection | None = None
         self._last_rule = "R0"
+        self._has_verdict = False
         self._last_explanation = "AMAN karena belum ada bukti api atau asap."
 
     def danger_threshold(self, risk_level: str | None) -> float:
@@ -161,6 +162,7 @@ class DecisionEngine:
         new_verdict = verdict if verdict is not None and verdict.ok else None
         if new_verdict is not None:
             self.verdicts.append(new_verdict)
+            self._has_verdict = True
         confirmations = self._confirmations(threshold) if new_verdict is not None else 0
 
         inputs: dict[str, Any] = {
@@ -258,17 +260,23 @@ class DecisionEngine:
         # else: LLM available but no verdict this step, so nothing new is known.
 
         if not clean_step:
-            if self.level == Level.AMAN:
-                waiting = " Detektor lokal aktif, menunggu verifikasi AI." if self.t1.active else ""
-                return "R0", f"Normal karena belum ada verifikasi AI yang menunjukkan kebakaran.{waiting}"
-            return self._last_rule, f"Masih berlaku: {self._last_explanation}"
+            if self._has_verdict or self.level != Level.AMAN:
+                # Nothing new: keep showing the last real reason (an R6 count already reads as "Tetap …").
+                if self._last_rule == "R6" or (self.level == Level.AMAN and self._last_rule in ("R0", "R5")):
+                    return self._last_rule, self._last_explanation
+                return self._last_rule, f"Masih berlaku: {self._last_explanation}"
+            waiting = " Detektor lokal aktif, menunggu verifikasi AI." if self.t1.active else ""
+            return "R0", f"Normal karena belum ada verifikasi AI yang menunjukkan kebakaran.{waiting}"
 
+        note = ""
+        if v is not None and v.lookalike != "none":
+            note = f" AI menilai gambar mirip {_LOOKALIKE_NAMES.get(v.lookalike, v.lookalike)}, bukan api/asap."
         if self.level != Level.AMAN:
-            return self._remember("R6", self._step_clear(llm_available))
+            return self._remember("R6", self._step_clear(llm_available) + note)
         self.sub_status = None
         self._clear_steps = 0
         source = "verifikasi AI" if llm_available else "detektor lokal"
-        return self._remember("R0", f"Normal karena tidak ada bukti api atau asap dari {source}.")
+        return self._remember("R0", f"Normal karena tidak ada bukti api atau asap dari {source}.{note}")
 
     def _confirmations(self, threshold: float) -> int:
         return sum(

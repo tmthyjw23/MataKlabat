@@ -79,7 +79,7 @@ class IncidentTools:
             return {"status": "unavailable", "reason": "data cuaca belum tersedia"}
         now = risk.get("now") or {}
         return {
-            "source": "Open-Meteo (data model, titik referensi Puncak Klabat)",
+            "source": "Open-Meteo (data model, kaki Klabat / Airmadidi)",
             "temperature_c": now.get("temp_c"),
             "humidity_pct": now.get("rh_pct"),
             "wind_kmh": now.get("wind_kmh"),

@@ -26,7 +26,7 @@ from mataklabat.tools import TOOL_SCHEMAS, IncidentTools
 log = logging.getLogger(__name__)
 
 AI_LABEL = "_Dihasilkan AI. Verifikasi lapangan diperlukan._"
-TEMPLATE_LABEL = "_Laporan otomatis dari template (AI tidak tersedia). Verifikasi lapangan diperlukan._"
+TEMPLATE_LABEL = "_Laporan otomatis dari template"  # followed by the reason, e.g. "(AI nonaktif)"
 SECTIONS = (
     "Ringkasan",
     "Bukti",
@@ -126,7 +126,7 @@ def incident_brief(camera: CameraConfig, decision: Decision) -> str:
     return "\n".join(lines)
 
 
-def template_report(camera: CameraConfig, decision: Decision, tools: IncidentTools) -> Report:
+def template_report(camera: CameraConfig, decision: Decision, tools: IncidentTools, reason: str = "AI nonaktif") -> Report:
     """Deterministic report from the same tools, used when the agent is unavailable."""
     steps: list[dict[str, Any]] = []
 
@@ -171,7 +171,7 @@ def template_report(camera: CameraConfig, decision: Decision, tools: IncidentToo
     ] or ["- tidak tersedia"]
     toward = spread["spread_toward"] if spread else "arah angin"
     md = "\n".join([
-        TEMPLATE_LABEL, "",
+        f"{TEMPLATE_LABEL} ({reason}). Verifikasi lapangan diperlukan._", "",
         "## Ringkasan",
         f"{camera.id} ({camera.name}) berstatus Kebakaran Terdeteksi sejak {messages.format_time(decision.ts)}. {decision.explanation}",
         "", "## Bukti", *evidence,
@@ -244,17 +244,22 @@ class IncidentReporter:
         now = self._clock()
         last = self._last_agent_run.get(camera.id)
         cooling = last is not None and now - last < self.settings.agent_cooldown_s
+        reason = "AI nonaktif"
         if self.agent is not None and not cooling:
             self._last_agent_run[camera.id] = now
             try:
                 return self.agent.run(camera, decision)
             except (AgentError, openai.APIError) as exc:
                 log.warning("AI Agent gagal (%s), memakai laporan template.", exc)
+                reason = "AI Agent gagal atau melewati batas waktu"
             except Exception:
                 log.exception("AI Agent error tak terduga, memakai laporan template.")
+                reason = "AI Agent error"
         elif cooling:
+            minutes = round(self.settings.agent_cooldown_s / 60)
             log.info("%s: AI Agent dalam cooldown, memakai laporan template.", camera.id)
-        return template_report(camera, decision, self.tools)
+            reason = f"AI Agent sudah membuat laporan untuk kamera ini dalam {minutes} menit terakhir"
+        return template_report(camera, decision, self.tools, reason)
 
     def _run(self) -> None:
         while not self._stop.is_set():

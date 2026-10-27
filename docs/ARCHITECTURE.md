@@ -170,7 +170,7 @@ Jawab HANYA dalam JSON sesuai skema. reasoning dan evidence dalam Bahasa Indones
 
 ### 6.1 Risiko Kawasan (FWI + FDRS Indonesia)
 
-Pengganti FRI heuristik (v1). Cuaca per jam Open-Meteo untuk Puncak Klabat → pengamatan pukul 12:00 WITA + hujan 24 jam → rantai FWI Kanada (Van Wagner 1987; penyesuaian lintang ekuator seperti `cffdrs`). Kelas FDRS Indonesia (de Groot dkk. 2006):
+Pengganti FRI heuristik (v1). Cuaca per jam Open-Meteo untuk `weather_point` di `resources.yaml` (Airmadidi, kaki Klabat; bukan puncak ±2.000 m yang jauh lebih dingin dan lembap) → pengamatan pukul 12:00 WITA + hujan 24 jam → rantai FWI Kanada (Van Wagner 1987; penyesuaian lintang ekuator seperti `cffdrs`). Kelas FDRS Indonesia (de Groot dkk. 2006):
 
 | Indikator | Rendah | Sedang | Tinggi | Sangat Tinggi |
 |---|---|---|---|---|
@@ -376,4 +376,7 @@ reference_points:
 | 2026-10-26 | Live update: SSE `/api/stream` hanya mengirim sinyal "ada perubahan" (dicek tiap 1 dtk); halaman mengambil ulang JSON. Fallback refresh tiap 15 dtk | Sederhana dan tahan proxy; tidak perlu WebSocket |
 | 2026-10-26 | `Referrer-Policy: strict-origin-when-cross-origin` (bukan `no-referrer`) | Kebijakan tile OpenStreetMap meminta Referer; hanya origin yang dikirim |
 | 2026-10-26 | Kesehatan komponen punya status ketiga "Nonaktif" (`ok=-1`) untuk AI/Telegram yang sengaja tidak diisi | Tidak menampilkan merah "Bermasalah" untuk konfigurasi yang disengaja |
+| 2026-10-27 | Titik cuaca risiko kawasan = `weather_point` (Airmadidi, kaki Klabat), bukan Puncak Klabat | Gladi: cuaca puncak memberi 15 °C/85 % dan risiko "Sedang", sedangkan kaki gunung (tempat api 2026 bermula) 28 °C dan risiko "Sangat Tinggi" (DC 468) |
+| 2026-10-27 | Penjelasan R0/R6 menyebut jenis lookalike dari verdict bersih ("AI menilai gambar mirip kabut/awan"); langkah tanpa verdict baru mempertahankan alasan terakhir tanpa awalan ganda | Gladi: model menjawab kabut sebagai `hazard_type=none, lookalike=fog_cloud` (bukan R5), sehingga alasan AI sebelumnya hilang dari dashboard |
+| 2026-10-27 | Label laporan template menyebut alasannya (AI nonaktif / gagal / cooldown 10 menit) | Gladi: laporan cooldown berlabel "AI tidak tersedia" menyesatkan |
 | | *(agent menambahkan baris di sini)* | |

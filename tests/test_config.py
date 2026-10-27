@@ -215,3 +215,13 @@ def test_risk_point_prefers_reference_point(tmp_path):
 
 def test_risk_point_falls_back_to_first_camera(tmp_path):
     assert load_settings(make_root(tmp_path, resources=None)).risk_point == (1.42, 124.98)
+
+
+def test_weather_point_wins_over_reference_point(tmp_path):
+    res = VALID_RESOURCES + 'weather_point: {name: "Kaki", lat: 1.43, lon: 124.98}\n'
+    assert load_settings(make_root(tmp_path, resources=res)).risk_point == (1.43, 124.98)
+
+
+def test_repo_weather_point_is_on_the_lower_slope():
+    s = load_settings(PROJECT_ROOT, env_file=None)
+    assert s.risk_point == (1.42749, 124.98029)

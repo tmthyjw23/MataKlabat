@@ -46,7 +46,7 @@ Hasilnya tampil di **website** (FastAPI + halaman web ringan) dan dikirim ke **T
 
 ### 3.1 Risiko Kebakaran Kawasan (pencegahan)
 
-Satu nilai untuk seluruh kawasan, dihitung dari cuaca di titik referensi Puncak Klabat.
+Satu nilai untuk seluruh kawasan, dihitung dari cuaca di kaki Klabat (`weather_point`, Airmadidi). *(Revisi 27 Okt: semula Puncak Klabat, lihat Decision Log.)*
 
 | Level | Arti untuk pengguna | Saran tindakan (template) |
 |---|---|---|
@@ -150,7 +150,7 @@ Prinsip: monitor satu-satunya penulis DB; web hanya membaca. Salah satu crash ti
 
 ### 6.1 Data
 
-Open-Meteo `forecast` untuk titik Puncak Klabat, `timezone=Asia/Makassar`, `past_days` maksimum yang diizinkan API, `forecast_days=4`:
+Open-Meteo `forecast` untuk `weather_point` (Airmadidi, kaki Klabat), `timezone=Asia/Makassar`, `past_days` maksimum yang diizinkan API, `forecast_days=4`:
 - per jam: `temperature_2m`, `relative_humidity_2m`, `wind_speed_10m`, `wind_direction_10m`, `precipitation`.
 - Nilai harian FWI memakai **pengamatan pukul 12:00 WITA** (suhu, RH, angin) dan **hujan 24 jam** sebelumnya (12:00 kemarin s/d 12:00 hari ini), sesuai konvensi FWI.
 

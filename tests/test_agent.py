@@ -119,7 +119,8 @@ def test_reporter_without_llm_and_cooldown(settings):
     agent = IncidentAgent(settings, make_tools(settings), client=FakeClient(reply(content=REPORT), reply(content=REPORT)))
     reporter.agent = agent
     assert reporter.build(CAM, decision()).source == "agent"
-    assert reporter.build(CAM, decision()).source == "template"  # same camera within AGENT_COOLDOWN_S
+    cooled = reporter.build(CAM, decision())  # same camera within AGENT_COOLDOWN_S
+    assert cooled.source == "template" and "dalam 10 menit terakhir" in cooled.markdown.splitlines()[0]
 
 
 def test_report_message_for_telegram():
