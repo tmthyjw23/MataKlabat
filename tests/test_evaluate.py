@@ -87,21 +87,46 @@ def test_per_class_limit(test_set):
     assert len(preds) == 6 and {p.file.split("/")[1] for p in preds} == {"0.png"}
 
 
-def test_failed_llm_calls_are_excluded_and_stop_the_run(test_set):
-    from mataklabat.evaluation import LLMUnavailable
-
+def test_failed_call_is_retried_once(test_set):
     settings = Settings(root=".", cameras=(), resources=Resources())
     calls = {"n": 0}
 
     def flaky(image, ctx, version):
         calls["n"] += 1
-        return LLMVerdict.failed("api_error: APIConnectionError", "v2") if calls["n"] == 2 else fake_verify(image, ctx, "v2")
+        return LLMVerdict.failed("api_error: APITimeoutError", "v2") if calls["n"] == 2 else fake_verify(image, ctx, "v2")
 
-    preds = evaluate(test_set, settings, ["v2"], flaky)
-    row = metrics(preds)[0]
-    assert row["errors"] == 1 and row["n"] == 11
-    with pytest.raises(LLMUnavailable, match="9router"):
-        evaluate(test_set, settings, ["v2"], lambda *a: LLMVerdict.failed("api_error: APIConnectionError", "v2"))
+    waits = []
+    preds = evaluate(test_set, settings, ["v2"], flaky, sleep=waits.append)
+    assert len(preds) == 12 and all(p.error is None for p in preds)
+    assert waits == [10.0] and calls["n"] == 13
+
+
+def test_outage_stops_with_partial_results_and_resume_continues(test_set, tmp_path):
+    from mataklabat.evaluation import LLMUnavailable, load_predictions, write_outputs
+
+    settings = Settings(root=".", cameras=(), resources=Resources())
+    calls = {"n": 0}
+
+    def dies_after_four(image, ctx, version):
+        calls["n"] += 1
+        return fake_verify(image, ctx, version) if calls["n"] <= 4 else LLMVerdict.failed("api_error: APITimeoutError", "v2")
+
+    with pytest.raises(LLMUnavailable, match="--resume") as exc:
+        evaluate(test_set, settings, ["v2"], dies_after_four, sleep=lambda s: None)
+    partial = exc.value.predictions
+    assert len(partial) == 4 and all(p.error is None for p in partial)
+
+    write_outputs(partial, tmp_path)
+    previous = load_predictions(tmp_path / "predictions.csv")
+    assert [(p.variant, p.file, p.level) for p in previous] == [(p.variant, p.file, p.level) for p in partial]
+    seen = []
+
+    def recording(image, ctx, version):
+        seen.append(1)
+        return fake_verify(image, ctx, version)
+
+    full = evaluate(test_set, settings, ["v2"], recording, previous=previous)
+    assert len(full) == 12 and len(seen) == 8  # only the 8 images not done before
 
 
 def test_cli_script_compiles():

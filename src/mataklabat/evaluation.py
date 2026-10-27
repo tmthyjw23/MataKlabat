@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import csv
 import statistics
+import time
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -32,10 +33,15 @@ CLASSES = POSITIVE_CLASSES + LOOKALIKE_CLASSES + ("normal",)
 LEVELS = ("AMAN", "WASPADA", "BAHAYA")
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
 MAX_CONSECUTIVE_ERRORS = 3
+RETRY_WAIT_S = 10.0
 
 
 class LLMUnavailable(RuntimeError):
-    """The LLM failed on several images in a row; results would be meaningless."""
+    """The LLM failed several times in a row; `predictions` holds what was done so far."""
+
+    def __init__(self, message: str, predictions: list | None = None):
+        super().__init__(message)
+        self.predictions = predictions or []
 
 
 @dataclass
@@ -104,43 +110,80 @@ def evaluate(
     repeat: int = 1,
     progress: Callable[[str], None] = lambda msg: None,
     per_class: int | None = None,
+    previous: list[Prediction] | None = None,
+    retry_wait_s: float = RETRY_WAIT_S,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> list[Prediction]:
+    """Evaluate every image. `previous` (from --resume) is kept and those (variant, file)
+    pairs are skipped. On an outage, LLMUnavailable carries everything done so far."""
     detector = ColorMotionDetector(settings.fire_gain, settings.smoke_gain, use_motion=False)
-    predictions: list[Prediction] = []
+    predictions: list[Prediction] = list(previous or [])
+    done = {(p.variant, p.file) for p in predictions}
     images = list_images(test_set, per_class)
     consecutive_errors = 0
+
+    def ask(image: np.ndarray, ctx: PromptContext, variant: str) -> LLMVerdict:
+        verdict = verify(image, ctx, variant)
+        if not verdict.ok:  # one retry after a pause: timeouts are often temporary
+            sleep(retry_wait_s)
+            verdict = verify(image, ctx, variant)
+        return verdict
+
     for i, (label, path) in enumerate(images, start=1):
+        name = f"{label}/{path.name}"
+        todo = [v for v in variants if (v, name) not in done]
+        if not todo:
+            continue
         image = read_image(path)
         if image is None:
             progress(f"lewati (tidak bisa dibaca): {path}")
             continue
         local = detector.detect(Frame("EVAL", now_local(), image, 0))
-        name = f"{label}/{path.name}"
-        if "local" in variants:
+        if "local" in todo:
             predictions.append(Prediction("local", name, label, local_level(local.fire_score, local.smoke_score, settings),
                                           local.fire_score, local.smoke_score))
-        for variant in (v for v in variants if v in ("v1", "v2")):
+        for variant in (v for v in todo if v in ("v1", "v2")):
             if verify is None:
                 raise RuntimeError("LLM tidak aktif: isi LLM_MODEL atau pakai --no-llm")
             ctx = PromptContext("Kamera evaluasi (test set)", 0.0, now_local(), local.fire_score, local.smoke_score)
-            runs = [verify(image, ctx, variant) for _ in range(max(1, repeat))]
+            runs = [ask(image, ctx, variant) for _ in range(max(1, repeat))]
             if all(not r.ok for r in runs):
                 consecutive_errors += 1
                 if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
                     raise LLMUnavailable(
-                        f"{consecutive_errors} gambar berturut-turut gagal dicek LLM ({runs[0].error}). "
-                        "Pastikan 9router berjalan, lalu ulangi."
+                        f"{consecutive_errors} panggilan berturut-turut gagal ({runs[0].error}). "
+                        "Pastikan 9router berjalan, lalu lanjutkan dengan --resume.",
+                        predictions,
                     )
-            else:
-                consecutive_errors = 0
-            first = runs[0]
+                continue  # do not record a failed call: --resume will try it again
+            consecutive_errors = 0
+            first = next(r for r in runs if r.ok)
             predictions.append(Prediction(
                 variant, name, label, one_shot_level(first, settings), local.fire_score, local.smoke_score,
-                first.hazard_type, first.lookalike, first.confidence if first.ok else None, first.reasoning, first.error,
-                repeats=[(one_shot_level(r, settings), r.confidence if r.ok else None) for r in runs],
+                first.hazard_type, first.lookalike, first.confidence, first.reasoning, None,
+                repeats=[(one_shot_level(r, settings), r.confidence if r.ok else None) for r in runs if r.ok],
             ))
         progress(f"[{i}/{len(images)}] {name}")
     return predictions
+
+
+def load_predictions(path: Path) -> list[Prediction]:
+    """Read a predictions.csv written by `write_outputs` (for --resume)."""
+    if not path.is_file():
+        return []
+    out = []
+    with path.open(encoding="utf-8", newline="") as fh:
+        for row in csv.DictReader(fh):
+            if row.get("error"):
+                continue
+            conf = float(row["confidence"]) if row.get("confidence") else None
+            levels = [lvl for lvl in (row.get("repeat_levels") or "").split("|") if lvl]
+            out.append(Prediction(
+                row["variant"], row["file"], row["label"], row["level"],
+                float(row["fire_score"]), float(row["smoke_score"]), row["hazard_type"], row["lookalike"],
+                conf, row["reasoning"], None, repeats=[(lvl, None) for lvl in levels],
+            ))
+    return out
 
 
 def _ratio(n: int, d: int) -> float | None:

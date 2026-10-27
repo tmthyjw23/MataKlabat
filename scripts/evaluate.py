@@ -13,7 +13,9 @@ import sys
 from pathlib import Path
 
 from mataklabat.config import ConfigError, load_settings
-from mataklabat.evaluation import CLASSES, LLMUnavailable, evaluate, list_images, metrics, write_outputs
+from mataklabat.evaluation import (
+    CLASSES, LLMUnavailable, evaluate, list_images, load_predictions, metrics, write_outputs,
+)
 from mataklabat.vision_llm import RateLimiter, VisionVerifier
 
 
@@ -29,6 +31,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--interval", type=float, help="Jeda minimum antar panggilan LLM (default LLM_MIN_INTERVAL_S).")
     parser.add_argument("--per-class", type=int, help="Hanya N gambar pertama per kelas (misal untuk uji konsistensi).")
     parser.add_argument("--out", type=Path, default=Path("results"), help="Folder hasil.")
+    parser.add_argument("--resume", action="store_true", help="Lanjutkan dari results/predictions.csv yang sudah ada.")
     args = parser.parse_args(argv)
 
     try:
@@ -57,10 +60,16 @@ def main(argv: list[str] | None = None) -> int:
     small = [c for c, n in counts.items() if n < 10]
     if small:
         print(f"Peringatan: kurang dari 10 gambar untuk {', '.join(small)}.")
+    previous = load_predictions(args.out / "predictions.csv") if args.resume else []
+    if previous:
+        print(f"Melanjutkan: {len(previous)} prediksi sudah ada dan dilewati.")
     try:
-        predictions = evaluate(args.set, settings, variants, verify, args.repeat, progress=print, per_class=args.per_class)
+        predictions = evaluate(args.set, settings, variants, verify, args.repeat, progress=print,
+                               per_class=args.per_class, previous=previous)
     except LLMUnavailable as exc:
-        print(f"\nEvaluasi dihentikan: {exc}", file=sys.stderr)
+        write_outputs(exc.predictions, args.out)
+        print(f"\nEvaluasi dihentikan: {exc}\nHasil sementara ({len(exc.predictions)} prediksi) disimpan di {args.out}.",
+              file=sys.stderr)
         return 3
     paths = write_outputs(predictions, args.out)
     print()

@@ -104,6 +104,7 @@ class Settings:
     # Pipeline pacing
     process_fps: float = 2.0
     llm_min_interval_s: float = 8.0
+    llm_timeout_s: float = 40.0
     heartbeat_s: float = 120.0
 
     # §4.1 local detector

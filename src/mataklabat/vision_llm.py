@@ -26,7 +26,6 @@ from mataklabat.prompts import PromptContext, build_prompt
 
 log = logging.getLogger(__name__)
 
-TIMEOUT_S = 20.0
 MAX_IMAGE_SIDE = 1024
 JPEG_QUALITY = 85
 MAX_EVIDENCE = 4
@@ -216,7 +215,7 @@ class VisionVerifier:
         self.client = client or openai.OpenAI(
             base_url=settings.llm_base_url,
             api_key=settings.llm_api_key or "tanpa-key",
-            timeout=TIMEOUT_S,
+            timeout=settings.llm_timeout_s,
             max_retries=0,  # the decision engine retries on its own schedule
         )
         self.limiter = limiter or RateLimiter(settings.llm_min_interval_s)
