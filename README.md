@@ -33,7 +33,7 @@ Analisis akar masalah dan Fishbone: [`docs/RCA.md`](docs/RCA.md).
 | Multi-kamera | Webcam, video berulang, RTSP, dan Kamera Foto (folder) |
 | Deteksi 2 tahap | Detektor lokal murah di setiap frame; LLM vision (via [9router](https://github.com/decolua/9router)) hanya saat dipicu |
 | Keputusan yang bisa dijelaskan | Aturan R0–R6, konfirmasi 2 dari 3 cek, penolakan lookalike (kabut, senja, lampu), jejak keputusan untuk setiap event |
-| Telegram bertingkat | Kebakaran Terdeteksi (langsung), Perlu Dicek (dibatasi), risiko naik, ringkasan pagi; antrean dengan kirim ulang otomatis |
+| Telegram bertingkat | Kebakaran Terdeteksi (langsung), Perlu Dicek (dibatasi; yang belum terverifikasi AI hanya di dashboard), risiko naik, ringkasan pagi; antrean dengan kirim ulang otomatis |
 | AI Agent | Tool calling: cuaca, hotspot NASA FIRMS, arah sebaran, desa terancam, sumber daya; cadangan laporan template |
 | Website | Dashboard live, peta topografi/satelit/jalan, detail insiden, kesehatan sistem; terang/gelap; bisa dibuka di HP |
 | Standar production | Satu perintah `up`, restart otomatis, heartbeat, log berotasi, retensi data, 239 test otomatis |
@@ -217,7 +217,7 @@ Ulangi dengan `python scripts/fetch_media.py` lalu `python scripts/evaluate.py -
 - **Prototipe akademik**, bukan pengganti sistem resmi BPBD, Manggala Agni, atau BMKG.
 - Gambar kamera disimulasikan. Kamera lapangan butuh daya, jaringan, pelindung cuaca, dan posisi tinggi.
 - Cuaca berasal dari **model** Open-Meteo (resolusi beberapa km), bukan stasiun di lokasi. Ambang DC dikalibrasi untuk kabut asap gambut; di Klabat dibaca sebagai indikator kekeringan.
-- LLM butuh 9router dan internet; tanpa itu status maksimal "Perlu Dicek (belum terverifikasi)".
+- LLM butuh 9router dan internet; tanpa itu status maksimal "Perlu Dicek (belum terverifikasi)", dan status ini tidak dikirim ke Telegram.
 - Deteksi malam hari serta asap sangat tipis/jauh masih lemah.
 
 ### Kalau ingin di-online-kan

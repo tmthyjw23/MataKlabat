@@ -280,7 +280,7 @@ karakter. Jangan mengarang data yang tidak dikembalikan tools; tulis "tidak ters
 
 ### 7.4 Peringatan (Spec §8)
 
-Bertingkat dan otomatis lewat tabel `outbox`: Kebakaran Terdeteksi (langsung, dengan foto), Perlu Dicek (maks 1 per kamera per `CHECK_ALERT_COOLDOWN_S`), laporan AI (pesan kedua), risiko kawasan naik ke Tinggi/Sangat Tinggi, ringkasan pagi `MORNING_SUMMARY_AT`. `AUTO_SEND_ALERT=false` atau Telegram belum diisi = mode kering (pesan dibuat, tidak dikirim). Laporan selalu diberi label *"Dihasilkan AI. Verifikasi lapangan diperlukan."*
+Bertingkat dan otomatis lewat tabel `outbox`: Kebakaran Terdeteksi (langsung, dengan foto), Perlu Dicek (maks 1 per kamera per `CHECK_ALERT_COOLDOWN_S`; R4 "belum terverifikasi" hanya di dashboard sampai AI mengonfirmasi), laporan AI (pesan kedua), risiko kawasan naik ke Tinggi/Sangat Tinggi, ringkasan pagi `MORNING_SUMMARY_AT`. `AUTO_SEND_ALERT=false` atau Telegram belum diisi = mode kering (pesan dibuat, tidak dikirim). Laporan selalu diberi label *"Dihasilkan AI. Verifikasi lapangan diperlukan."*
 
 ---
 
@@ -382,4 +382,5 @@ reference_points:
 | 2026-10-27 | Penjelasan R0/R6 menyebut jenis lookalike dari verdict bersih ("AI menilai gambar mirip kabut/awan"); langkah tanpa verdict baru mempertahankan alasan terakhir tanpa awalan ganda | Gladi: model menjawab kabut sebagai `hazard_type=none, lookalike=fog_cloud` (bukan R5), sehingga alasan AI sebelumnya hilang dari dashboard |
 | 2026-10-27 | Label laporan template menyebut alasannya (AI nonaktif / gagal / cooldown 10 menit) | Gladi: laporan cooldown berlabel "AI tidak tersedia" menyesatkan |
 | 2026-10-27 | **Kategori `controlled_fire`** di kontrak §5.1 dan prompt v2: api kecil terkendali → R3 Perlu Dicek (potensi), bukan Kebakaran Terdeteksi | Uji 8 foto api unggun/pembakaran: model mengisi `fire_visible=true` untuk semua api, sehingga R1 selalu menang atas R3 dan status potensi tidak pernah muncul. Keputusan pemilik: api terkendali = potensi. Setelah perubahan, 7/8 foto potensi → Perlu Dicek; v2 diuji ulang pada 72 foto |
+| 2026-10-27 | **R4 (belum terverifikasi) tidak dikirim ke Telegram**: hanya tampil di dashboard. Kalau AI pulih dan mengonfirmasi Perlu Dicek di kamera yang sama, pesan dikirim saat itu; kalau AI menolak (lookalike), tidak ada pesan. Recorder memberi tahu listener saat sub-status berubah pada level yang sama (`on_sub_status_change`) | Gladi: kuota 9router habis, detektor lokal memicu di awan, dan 3 pesan "belum terverifikasi" masuk grup tanpa kebakaran. Keputusan pemilik |
 | | *(agent menambahkan baris di sini)* | |

@@ -33,6 +33,9 @@ def snapshot(level="Tinggi", fetched=None) -> RiskSnapshot:
 
 
 RISK = risk_to_dict(snapshot())
+WEAK = LLMVerdict(smoke_visible=True, hazard_type="smoke", confidence=0.5, prompt_version="v2", reasoning="Asap samar.")
+FOG = LLMVerdict(smoke_visible=True, hazard_type="smoke", confidence=0.9, prompt_version="v2",
+                 lookalike="fog_cloud", reasoning="Kabut.")
 
 
 def decision(verdict=SMOKE, scores=(0.31, 0.44), times=1, llm=True):
@@ -128,9 +131,25 @@ def test_fire_alert_enqueued_and_report_requested(setup, tmp_path):
     assert reports and reports[0][0] == incident_id
 
 
+def check_decision():
+    d = decision(verdict=WEAK, scores=(0.4, 0.0))
+    assert (d.level, d.level_from, d.rule) == (Level.WASPADA, Level.AMAN, "R2")
+    return d
+
+
+def unverified_then(verdict):
+    """A camera held as R4 'unverified', then the AI answers again."""
+    engine = DecisionEngine("CAM-01", Settings(root=Path("."), cameras=(CAM,), resources=Resources()))
+    ts = datetime(2026, 10, 26, 14, 32, tzinfo=TZ)
+    for _ in range(3):
+        held = engine.update(LocalDetection("CAM-01", ts, 0.4, 0.0), verdict=None, llm_available=False)
+    after = engine.update(LocalDetection("CAM-01", ts, 0.4, 0.0), verdict=verdict, llm_available=True)
+    return held, after
+
+
 def test_check_alert_cooldown(setup):
     alerts, _, read, clock, _, _ = setup()
-    d = decision(verdict=None, scores=(0.4, 0.0), times=3, llm=False)
+    d = check_decision()
     alerts.on_level_change(d, None)
     clock.t = 600
     alerts.on_level_change(d, None)
@@ -149,10 +168,45 @@ def test_no_check_alert_when_falling_from_bahaya(setup):
     assert read.outbox() == []
 
 
+def test_unverified_check_stays_on_dashboard(setup):
+    alerts, _, read, _, _, _ = setup()
+    held, _ = unverified_then(None)
+    assert held.rule == "R4" and held.sub_status == "unverified"
+    alerts.on_level_change(held, None)
+    assert read.outbox() == []
+
+
+def test_unverified_check_sent_once_ai_confirms(setup):
+    alerts, _, read, _, _, _ = setup()
+    held, after = unverified_then(WEAK)
+    assert (after.level, after.changed, after.sub_status) == (Level.WASPADA, False, None)
+    alerts.on_level_change(held, None)
+    alerts.on_sub_status_change(after, None)
+    alerts.on_sub_status_change(after, None)  # only once
+    [item] = read.outbox()
+    assert item["kind"] == "check" and "belum terverifikasi" not in item["text"]
+
+
+def test_unverified_check_dropped_when_ai_rejects(setup):
+    alerts, _, read, _, _, _ = setup()
+    held, after = unverified_then(FOG)
+    assert after.sub_status == "rejected_lookalike"
+    alerts.on_level_change(held, None)
+    alerts.on_sub_status_change(after, None)
+    assert read.outbox() == []
+
+
+def test_sub_status_change_without_hold_sends_nothing(setup):
+    alerts, _, read, _, _, _ = setup()
+    _, after = unverified_then(WEAK)
+    alerts.on_sub_status_change(after, None)
+    assert read.outbox() == []
+
+
 def test_dry_run_without_telegram_or_auto_send(setup):
     for overrides in ({"auto_send_alert": False}, {"telegram_bot_token": None}):
         alerts, storage, read, _, _, _ = setup(**overrides)
-        alerts.on_level_change(decision(verdict=None, scores=(0.4, 0.0), times=3, llm=False), None)
+        alerts.on_level_change(check_decision(), None)
         assert read.outbox()[0]["status"] == "dry_run"
         storage.close()
 

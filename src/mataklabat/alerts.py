@@ -3,6 +3,8 @@
 Tiers:
 - Kebakaran Terdeteksi: at once, one per incident, with photo.
 - Perlu Dicek: when a camera rises from Normal, at most once per camera per cooldown.
+  Not while the AI is unavailable (R4, "unverified"): that stays on the dashboard, and
+  the alert goes out only if the AI later confirms the check at the same camera.
 - Area risk: when the level rises to Tinggi or Sangat Tinggi.
 - Morning summary: once a day at MORNING_SUMMARY_AT.
 """
@@ -18,7 +20,7 @@ from typing import Any, Callable
 
 from mataklabat import messages
 from mataklabat.config import Settings, now_local
-from mataklabat.decision import Decision, Level
+from mataklabat.decision import SUB_REJECTED_LOOKALIKE, SUB_UNVERIFIED, Decision, Level
 from mataklabat.fwi import LEVELS
 from mataklabat.storage import OUTBOX_DRY_RUN, OUTBOX_PENDING, Storage, risk_to_dict
 
@@ -50,6 +52,7 @@ class AlertService:
         self._clock = clock
         self._wall = wall_clock
         self._last_check_alert: dict[str, float] = {}
+        self._held_unverified: set[str] = set()
         self._previous_risk: str | None = storage.current_risk_level()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -81,8 +84,27 @@ class AlertService:
             self.report_requester(incident_id, decision, photo)
 
     def on_level_change(self, decision: Decision, photo: Path | None) -> None:
+        self._held_unverified.discard(decision.camera_id)
         if not (decision.level == Level.WASPADA and decision.level_from == Level.AMAN):
             return
+        if decision.sub_status == SUB_UNVERIFIED:
+            # Without the AI the local detector alone is too noisy for the group chat.
+            self._held_unverified.add(decision.camera_id)
+            log.info("%s: Perlu Dicek (belum terverifikasi) hanya di dashboard, tidak ke Telegram.",
+                     decision.camera_id)
+            return
+        self._send_check_alert(decision, photo)
+
+    def on_sub_status_change(self, decision: Decision, photo: Path | None) -> None:
+        """The AI came back and judged a camera that was held as unverified."""
+        cam = decision.camera_id
+        if cam not in self._held_unverified or decision.sub_status == SUB_UNVERIFIED:
+            return
+        self._held_unverified.discard(cam)
+        if decision.level == Level.WASPADA and decision.sub_status != SUB_REJECTED_LOOKALIKE:
+            self._send_check_alert(decision, photo)
+
+    def _send_check_alert(self, decision: Decision, photo: Path | None) -> None:
         now = self._clock()
         last = self._last_check_alert.get(decision.camera_id)
         if last is not None and now - last < self.settings.check_alert_cooldown_s:

@@ -47,6 +47,9 @@ class Listener:
     def on_incident_closed(self, incident_id, decision):
         self.calls.append(("closed", incident_id))
 
+    def on_sub_status_change(self, decision, photo):
+        self.calls.append(("sub", decision.sub_status))
+
 
 class Clock:
     t = 0.0
@@ -90,6 +93,21 @@ def test_incident_opens_on_bahaya_and_closes_on_aman(env):
     status = read.camera_status("CAM-01")
     assert status["level"] == "AMAN" and status["online"] == 1
     assert (settings.snapshot_dir / status["last_snapshot"]).is_file()
+
+
+def test_sub_status_change_at_same_level_is_notified(env):
+    settings, storage, snaps = env
+    listener, clock = Listener(), Clock()
+    recorder = Recorder(storage, snaps, settings.cameras, listeners=[listener], clock=clock)
+    engine = DecisionEngine("CAM-01", settings)
+    for _ in range(3):  # AI down: R4 "unverified"
+        clock.t += 0.5
+        local = LocalDetection("CAM-01", now_local(), 0.4, 0.3)
+        d = engine.update(local, verdict=None, llm_available=False)
+        recorder.on_decision(d, local, Frame("CAM-01", d.ts, IMG, 1))
+    weak = LLMVerdict(smoke_visible=True, hazard_type="smoke", confidence=0.5, prompt_version="v2")
+    drive(engine, recorder, clock, weak, steps=2)
+    assert listener.calls == [("change", Level.WASPADA, listener.calls[0][2]), ("sub", None)]
 
 
 def test_events_written_on_change_verdict_and_heartbeat(env):

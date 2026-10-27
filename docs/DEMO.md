@@ -76,7 +76,7 @@ Opsional: arahkan **video** api di HP ke webcam CAM-01 untuk menunjukkan kamera 
 | Masalah | Tindakan |
 |---|---|
 | Banner "Monitor tidak merespons" | Supervisor biasanya menyalakan ulang sendiri dalam beberapa detik; cek terminal `up` |
-| 9router/internet mati | Status tetap jalan (maksimal Perlu Dicek, belum terverifikasi); jelaskan sebagai degradasi anggun; lanjut dengan video cadangan |
+| 9router/internet mati | Status tetap jalan (maksimal Perlu Dicek, belum terverifikasi; tidak ada pesan Telegram); jelaskan sebagai degradasi anggun; lanjut dengan video cadangan |
 | Telegram tidak masuk | Pesan tetap di antrean dan dikirim ulang; tunjukkan status di halaman insiden / `/health` |
 | Peta kosong | Internet putus; marker dan status tetap tampil; jelaskan |
 | Webcam tidak terbaca | Tutup aplikasi lain; demo tetap jalan dengan CAM-04 (foto) |

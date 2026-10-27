@@ -27,6 +27,8 @@ STATUS_INTERVAL_S = 1.0
 class RecorderListener(Protocol):
     def on_level_change(self, decision: Decision, photo: Path | None) -> None: ...
 
+    def on_sub_status_change(self, decision: Decision, photo: Path | None) -> None: ...
+
     def on_incident_opened(self, incident_id: int, decision: Decision, photo: Path | None) -> None: ...
 
     def on_incident_closed(self, incident_id: int, decision: Decision) -> None: ...
@@ -49,6 +51,7 @@ class Recorder:
         self._last_event_at: dict[str, float] = {}
         self._last_status_at: dict[str, float] = {}
         self._offline: set[str] = set()
+        self._sub_status: dict[str, str | None] = {}
         for cam in cameras:
             self.storage.upsert_camera_status(
                 cam.id, name=cam.name, mode=cam.mode, level=Level.AMAN.value,
@@ -66,8 +69,12 @@ class Recorder:
     def on_decision(self, decision: Decision, local: LocalDetection, frame: Frame) -> None:
         cam = decision.camera_id
         now = self._clock()
+        # Same level, different sub-status (e.g. "unverified" → verified by the AI).
+        sub_changed = not decision.changed and decision.sub_status != self._sub_status.get(cam)
+        self._sub_status[cam] = decision.sub_status
         need_event = (
             decision.changed
+            or sub_changed
             or decision.verdict is not None
             or now - self._last_event_at.get(cam, -1e9) >= EVENT_HEARTBEAT_S
         )
@@ -126,6 +133,8 @@ class Recorder:
 
         if decision.changed:
             self._handle_change(decision, event_id, photo)
+        elif sub_changed:
+            self._notify("on_sub_status_change", decision, photo)
 
     def _handle_change(self, decision: Decision, event_id: int | None, photo: Path | None) -> None:
         cam = decision.camera_id
