@@ -201,7 +201,8 @@ Test set 72 foto berlisensi bebas (12 per kelas: api, asap, kabut, senja, lampu,
 | + LLM, prompt v2 | 1,00 | 1,00 | 1,00 | 0 / 0 / 0 / 0 |
 
 - **Dua tahap terbukti perlu:** detektor lokal tidak melewatkan kebakaran, tetapi hampir semua foto lain ikut memicu; LLM menghapus semua false alarm itu tanpa kehilangan satu kejadian pun.
-- **Pengaruh prompt (F5):** v2 menamai jenis lookalike dengan tepat 100% (v1: 89%), tetapi menyebut 92% foto hutan normal "mirip kabut" (v1: 58%): bias dari prompt yang menekankan kabut. Keputusan tetap benar.
+- **Pengaruh prompt (F5):** v2 menamai jenis lookalike dengan tepat 100% (v1: 89%), tetapi menyebut 100% foto hutan normal "mirip kabut" (v1: 58%): bias dari prompt yang menekankan kabut. Keputusan tetap benar.
+- **Api terkendali (`controlled_fire`, prompt v2 revisi 27 Okt):** 7/8 foto api unggun/pembakaran kecil → Perlu Dicek (potensi), 1 timeout; ke-24 foto kebakaran/asap tetap Kebakaran Terdeteksi.
 - **Konsistensi (F4):** v2, 12 foto × 3 ulangan: keputusan 100% sama, simpangan baku keyakinan 0,004. Label lookalike untuk foto normal tidak selalu sama antar-ulangan.
 - **Keterbatasan:** sebagian besar foto api/asap adalah kebakaran besar (keyakinan ≥ 0,95). Kasus sulit (asap tipis di kejauhan, kabut asap, malam hari) belum terwakili, jadi skor sempurna ini tidak boleh digeneralisasi.
 

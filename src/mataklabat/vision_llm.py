@@ -32,7 +32,9 @@ MAX_EVIDENCE = 4
 MAX_REASONING_WORDS = 60
 MAX_ACTION_WORDS = 25
 
-HAZARD_TYPES = ("none", "smoke", "flame", "smoke_and_flame", "haze", "uncertain")
+# controlled_fire: a small fire that is clearly contained and tended (campfire, cooking fire,
+# a small pile being burnt) - a prevention signal, not a forest fire.
+HAZARD_TYPES = ("none", "smoke", "flame", "smoke_and_flame", "haze", "uncertain", "controlled_fire")
 LOOKALIKES = ("none", "fog_cloud", "sunset_glare", "artificial_light", "dust", "steam", "other")
 SEVERITIES = ("none", "low", "medium", "high")
 RISK_FACTORS = (

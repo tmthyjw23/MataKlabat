@@ -97,12 +97,13 @@ def one_shot_level(v: LLMVerdict, settings: Settings) -> str:
     """Single-verdict version of rules R1/R2/R3/R5 (no confirmation window, default threshold)."""
     if not v.ok:
         return "AMAN"
-    real = v.positive and v.lookalike == "none"
+    controlled = v.hazard_type == "controlled_fire"
+    real = v.positive and v.lookalike == "none" and not controlled
     if real and v.confidence >= settings.conf_danger:
         return "BAHAYA"
     if real and v.confidence >= settings.conf_warn:
         return "WASPADA"
-    if v.hazard_type == "uncertain" or any(r in POTENTIAL_RISKS for r in v.risk_factors):
+    if controlled or v.hazard_type == "uncertain" or any(r in POTENTIAL_RISKS for r in v.risk_factors):
         return "WASPADA"
     return "AMAN"
 

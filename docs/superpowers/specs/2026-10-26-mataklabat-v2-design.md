@@ -68,6 +68,8 @@ Label baru untuk level Decision Engine yang sudah ada (nama internal tetap, supa
 | `BAHAYA` | **Kebakaran Terdeteksi** | segi delapan | `#B42318` |
 | offline | **Offline** | lingkaran kosong | `#5B6560` |
 
+Api kecil yang terkendali (api unggun, tungku masak, pembakaran tumpukan kecil yang dijaga) diberi `hazard_type = controlled_fire` dan menjadi **Perlu Dicek (potensi)**, bukan Kebakaran Terdeteksi *(revisi 27 Okt)*.
+
 Sub-status tampil sebagai keterangan kecil: `unverified` → "belum terverifikasi AI", `POTENSI` → "potensi (faktor risiko terlihat)", `rejected_lookalike` → "AI menolak: mirip kabut/senja/lampu".
 
 ---

@@ -1,4 +1,4 @@
 variant,errors,f1,false_alarm_fog,false_alarm_lights,false_alarm_normal,false_alarm_sunset,lookalike_named_right,n,normal_called_lookalike,precision,recall,recall_any_alert
 local,0,0.522,1.0,0.75,1.0,0.917,,72,,0.353,1.0,1.0
 v1,0,1.0,0.0,0.0,0.0,0.0,0.889,72,0.583,1.0,1.0,1.0
-v2,0,1.0,0.0,0.0,0.0,0.0,1.0,72,0.917,1.0,1.0,1.0
+v2,0,1.0,0.0,0.0,0.0,0.0,1.0,72,1.0,1.0,1.0,1.0

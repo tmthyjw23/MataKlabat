@@ -137,3 +137,8 @@ def test_cli_script_compiles():
 
     py_compile.compile(str(Path(__file__).resolve().parents[1] / "scripts" / "evaluate.py"), doraise=True)
     py_compile.compile(str(Path(__file__).resolve().parents[1] / "scripts" / "fetch_media.py"), doraise=True)
+
+
+def test_one_shot_controlled_fire_is_waspada():
+    s = Settings(root=".", cameras=(), resources=Resources())
+    assert one_shot_level(LLMVerdict(fire_visible=True, hazard_type="controlled_fire", confidence=0.95), s) == "WASPADA"

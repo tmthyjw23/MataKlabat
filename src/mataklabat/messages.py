@@ -29,6 +29,7 @@ _HAZARD_WORDS = {
     "smoke_and_flame": "api dan asap",
     "haze": "kabut asap",
     "uncertain": "tidak pasti",
+    "controlled_fire": "api kecil terkendali",
     "none": "tidak ada api/asap",
 }
 _LOOKALIKE_WORDS = {

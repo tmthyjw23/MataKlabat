@@ -25,7 +25,11 @@ Tugas:
    berwarna abu-abu hingga coklat/kehitaman, bergerak naik.
 3. Catat FAKTOR RISIKO yang terlihat walau belum ada api (api unggun, orang membakar, sampah dibakar,
    vegetasi sangat kering).
-4. Jika ragu, gunakan hazard_type "uncertain" dan confidence rendah. Jangan menebak.
+4. Api kecil yang jelas TERKENDALI dan dijaga (api unggun di perapian, tungku masak, tumpukan kecil
+   sampah/daun yang sedang dibakar orang) BUKAN kebakaran hutan: gunakan hazard_type "controlled_fire"
+   dan isi risk_factors (campfire / people_burning / trash_burning). Pakai "flame", "smoke" atau
+   "smoke_and_flame" hanya untuk api atau asap yang menyebar ke vegetasi atau tidak terkendali.
+5. Jika ragu, gunakan hazard_type "uncertain" dan confidence rendah. Jangan menebak.
 Jawab HANYA dalam JSON sesuai skema. reasoning dan evidence dalam Bahasa Indonesia."""
 
 _COMPASS = (

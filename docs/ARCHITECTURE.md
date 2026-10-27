@@ -121,7 +121,7 @@ Gunakan `chat.completions` dengan `response_format={"type": "json_schema", ...}`
 | Field | Tipe | Nilai yang diizinkan |
 |---|---|---|
 | `fire_visible`, `smoke_visible` | bool | |
-| `hazard_type` | enum | `none`, `smoke`, `flame`, `smoke_and_flame`, `haze`, `uncertain` |
+| `hazard_type` | enum | `none`, `smoke`, `flame`, `smoke_and_flame`, `haze`, `uncertain`, `controlled_fire` (api kecil terkendali: api unggun, tungku masak, tumpukan kecil yang dibakar dan dijaga) |
 | `lookalike` | enum | `none`, `fog_cloud`, `sunset_glare`, `artificial_light`, `dust`, `steam`, `other` |
 | `confidence` | float 0–1 | keyakinan model terhadap `hazard_type` |
 | `severity` | enum | `none`, `low`, `medium`, `high` |
@@ -198,7 +198,9 @@ Pengganti FRI heuristik (v1). Cuaca per jam Open-Meteo untuk `weather_point` di 
 |---|---|---|
 | **R1** | Verdict positif (`fire_visible ∨ smoke_visible`), `lookalike = none`, `confidence ≥ ambang_bahaya`, dan terkonfirmasi `CONFIRM_MIN` dari `CONFIRM_WINDOW` | **BAHAYA** |
 | **R2** | Verdict positif dengan `confidence ∈ [CONF_WARN, ambang_bahaya)`, ATAU `hazard_type = uncertain` sementara trigger lokal T1 aktif | **WASPADA** |
-| **R3** | `risk_factors` mengandung `campfire`/`people_burning`/`trash_burning` | **WASPADA** (sub-status `POTENSI`) |
+| **R3** | `hazard_type = controlled_fire`, atau `risk_factors` mengandung `campfire`/`people_burning`/`trash_burning` (tanpa R1/R2) | **WASPADA** (sub-status `POTENSI`) |
+
+Verdict `controlled_fire` tidak pernah memicu R1/R2 walau `fire_visible = true`.
 | **R4** | Trigger lokal T1 aktif tapi LLM tidak tersedia (`llm_unavailable`) | **WASPADA** (`unverified`) |
 | **R5** | Verdict positif tapi `lookalike ≠ none` | tetap di level sekarang, catat `rejected_lookalike` |
 | **R6** | Tidak ada bukti selama `CLEAR_STEPS` | turun 1 level (BAHAYA → WASPADA → AMAN) |
@@ -379,4 +381,5 @@ reference_points:
 | 2026-10-27 | Titik cuaca risiko kawasan = `weather_point` (Airmadidi, kaki Klabat), bukan Puncak Klabat | Gladi: cuaca puncak memberi 15 °C/85 % dan risiko "Sedang", sedangkan kaki gunung (tempat api 2026 bermula) 28 °C dan risiko "Sangat Tinggi" (DC 468) |
 | 2026-10-27 | Penjelasan R0/R6 menyebut jenis lookalike dari verdict bersih ("AI menilai gambar mirip kabut/awan"); langkah tanpa verdict baru mempertahankan alasan terakhir tanpa awalan ganda | Gladi: model menjawab kabut sebagai `hazard_type=none, lookalike=fog_cloud` (bukan R5), sehingga alasan AI sebelumnya hilang dari dashboard |
 | 2026-10-27 | Label laporan template menyebut alasannya (AI nonaktif / gagal / cooldown 10 menit) | Gladi: laporan cooldown berlabel "AI tidak tersedia" menyesatkan |
+| 2026-10-27 | **Kategori `controlled_fire`** di kontrak §5.1 dan prompt v2: api kecil terkendali → R3 Perlu Dicek (potensi), bukan Kebakaran Terdeteksi | Uji 8 foto api unggun/pembakaran: model mengisi `fire_visible=true` untuk semua api, sehingga R1 selalu menang atas R3 dan status potensi tidak pernah muncul. Keputusan pemilik: api terkendali = potensi. Setelah perubahan, 7/8 foto potensi → Perlu Dicek; v2 diuji ulang pada 72 foto |
 | | *(agent menambahkan baris di sini)* | |

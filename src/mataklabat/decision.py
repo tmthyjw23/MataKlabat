@@ -217,7 +217,9 @@ class DecisionEngine:
         clean_step = False
 
         if v is not None:
-            real = v.positive and v.lookalike == "none"
+            # A controlled fire (campfire, cooking fire) is a prevention signal (R3), never R1/R2.
+            controlled = v.hazard_type == "controlled_fire"
+            real = v.positive and v.lookalike == "none" and not controlled
             confirmed = confirmations >= s.confirm_min or v.confidence >= s.conf_single_confirm
             potential = [r for r in v.risk_factors if r in POTENTIAL_RISKS]
 
@@ -234,15 +236,16 @@ class DecisionEngine:
                     f"Perlu Dicek karena AI ragu (uncertain, keyakinan {v.confidence:.2f}) sementara "
                     f"detektor lokal aktif pada {self.t1.describe()} frame terakhir.",
                 )
-            if potential:
+            if potential or controlled:
                 self._raise_to(Level.WASPADA, SUB_POTENSI)
-                names = ", ".join(_RISK_NAMES[r] for r in potential)
-                return self._remember(
-                    "R3",
-                    f"Perlu Dicek (potensi) karena AI melihat faktor risiko: {names}. "
-                    "Belum ada api atau asap kebakaran.",
-                )
-            if v.positive and v.lookalike != "none":
+                names = ", ".join(_RISK_NAMES[r] for r in potential) or "api terbuka"
+                if controlled:
+                    why = (f"AI melihat api kecil yang tampak terkendali ({names}), belum menyebar ke "
+                           "vegetasi. Perlu dicek dan dipastikan padam.")
+                else:
+                    why = f"AI melihat faktor risiko: {names}. Belum ada api atau asap kebakaran."
+                return self._remember("R3", f"Perlu Dicek (potensi) karena {why}")
+            if v.positive and v.lookalike != "none" and not controlled:
                 self.sub_status = SUB_REJECTED_LOOKALIKE
                 what = _hazard_words(v)
                 lookalike = _LOOKALIKE_NAMES.get(v.lookalike, v.lookalike)

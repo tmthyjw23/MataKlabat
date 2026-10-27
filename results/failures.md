@@ -1,6 +1,6 @@
 # Analisis kegagalan
 
-Dibuat 27-10-2026 13:55 WITA.
+Dibuat 27-10-2026 15:06 WITA.
 
 ## Ringkasan metrik
 
@@ -8,7 +8,7 @@ Dibuat 27-10-2026 13:55 WITA.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | local | 72 | 0 | 0.353 | 1.0 | 0.522 | 1.0 | 1.0 | 0.917 | 0.75 | 1.0 | - | - |
 | v1 | 72 | 0 | 1.0 | 1.0 | 1.0 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.889 | 0.583 |
-| v2 | 72 | 0 | 1.0 | 1.0 | 1.0 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 1.0 | 0.917 |
+| v2 | 72 | 0 | 1.0 | 1.0 | 1.0 | 1.0 | 0.0 | 0.0 | 0.0 | 0.0 | 1.0 | 1.0 |
 
 ## F1 · Kabut/awan dikira asap (false positive)
 
@@ -83,5 +83,6 @@ Perbedaan label lookalike (keputusan sama, cara model menamai berbeda):
 - `lights/lights_09.jpg`: v1 `sunset_glare` · v2 `artificial_light`
 - `normal/normal_01.jpg`: v1 `none` · v2 `fog_cloud`
 - `normal/normal_02.jpg`: v1 `none` · v2 `fog_cloud`
+- `normal/normal_06.jpg`: v1 `none` · v2 `fog_cloud`
 - `normal/normal_08.jpg`: v1 `none` · v2 `fog_cloud`
 - `normal/normal_12.jpg`: v1 `none` · v2 `fog_cloud`

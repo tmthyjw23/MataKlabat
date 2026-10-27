@@ -280,3 +280,16 @@ def test_r6_hold_steps_are_not_prefixed_twice(engine):
     d = step(engine, None)
     assert d.rule == "R6" and not d.explanation.startswith("Masih berlaku")
     assert "1/4 verifikasi AI bersih" in d.explanation and "mirip kabut/awan" in d.explanation
+
+
+def test_controlled_fire_is_potential_not_bahaya(engine):
+    campfire = v(0.95, fire=True, smoke=False, hazard="controlled_fire", risks=["campfire"])
+    d = step(engine, campfire)
+    assert (d.level, d.rule, d.sub_status) == (Level.WASPADA, "R3", "POTENSI")
+    assert "terkendali" in d.explanation and "api unggun" in d.explanation
+    assert step(engine, campfire).level == Level.WASPADA  # repeated: still never BAHAYA
+
+
+def test_spreading_fire_still_bahaya_after_campfire(engine):
+    step(engine, v(0.95, fire=True, smoke=False, hazard="controlled_fire", risks=["campfire"]))
+    assert step(engine, v(0.95, fire=True)).level == Level.BAHAYA
