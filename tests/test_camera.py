@@ -142,6 +142,35 @@ def test_check_telegram_hides_token_on_error(monkeypatch, tmp_path):
     assert ok is False and "SECRET" not in detail
 
 
+@pytest.mark.parametrize("chat, expect_ok, expect_text", [
+    ({"ok": True, "result": {"type": "group", "title": "MataKlabat"}}, True, 'grup "MataKlabat"'),
+    ({"ok": True, "result": {"type": "private", "first_name": "Tim"}}, True, "chat pribadi Tim (bukan grup)"),
+    ({"ok": False, "description": "Bad Request: chat not found"}, False, "chat not found"),
+])
+def test_check_telegram_names_target_chat(monkeypatch, tmp_path, chat, expect_ok, expect_text):
+    from mataklabat.config import Resources, Settings
+
+    class Resp:
+        def __init__(self, data):
+            self.data = data
+
+        def json(self):
+            return self.data
+
+    def fake_get(url, **k):
+        assert "sendMessage" not in url  # the check never posts
+        if url.endswith("/getMe"):
+            return Resp({"ok": True, "result": {"username": "MataKlabatBot"}})
+        assert k["params"] == {"chat_id": "-42"}
+        return Resp(chat)
+
+    monkeypatch.setattr(cli.requests, "get", fake_get)
+    settings = Settings(root=tmp_path, cameras=(), resources=Resources(),
+                        telegram_bot_token="123:SECRET", telegram_chat_id="-42")
+    _, ok, detail = cli.check_telegram(settings)
+    assert ok is expect_ok and expect_text in detail and "SECRET" not in detail
+
+
 # --- photo cameras (Spec §5.2) ------------------------------------------------------
 
 import os  # noqa: E402

@@ -166,7 +166,21 @@ def check_telegram(settings: Settings) -> CheckRow:
         data = resp.json()
         if not data.get("ok"):
             return ("Telegram", False, data.get("description", "token ditolak"))
-        return ("Telegram", True, f"bot @{data['result'].get('username', '?')}")
+        bot = f"bot @{data['result'].get('username', '?')}"
+        # getChat sends nothing; it only tells where messages would go.
+        resp = requests.get(
+            f"{TELEGRAM_API}/bot{settings.telegram_bot_token}/getChat",
+            params={"chat_id": settings.telegram_chat_id}, timeout=10,
+        )
+        chat = resp.json()
+        if not chat.get("ok"):
+            return ("Telegram", False, f"{bot}, chat {settings.telegram_chat_id}: "
+                    f"{chat.get('description', 'tidak bisa diakses')} (bot sudah di grup?)")
+        info = chat["result"]
+        if info.get("type") == "private":
+            name = " ".join(x for x in (info.get("first_name"), info.get("last_name")) if x)
+            return ("Telegram", True, f"{bot} → chat pribadi {name} (bukan grup)")
+        return ("Telegram", True, f"{bot} → grup \"{info.get('title', '?')}\"")
     except Exception as exc:  # noqa: BLE001
         # The request URL contains the token, so never print the exception text.
         return ("Telegram", False, type(exc).__name__)
