@@ -1,0 +1,25 @@
+variant,file,label,level,correct,fire_score,smoke_score,hazard_type,lookalike,confidence,repeat_levels,error,reasoning
+local,fire/fire_01.jpg,fire,WASPADA,1,1.000,0.000,,,,,,
+v2,fire/fire_01.jpg,fire,BAHAYA,1,1.000,0.000,smoke_and_flame,none,0.99,BAHAYA|BAHAYA|BAHAYA,,"Terlihat kebakaran hutan berskala besar yang sangat aktif di lereng bukit dekat jalan raya. Api melalap vegetasi lebat secara masif dengan asap tebal yang pekat, menciptakan bahaya ekstrem bagi ekosistem dan jalur transportasi."
+local,fire/fire_02.jpg,fire,WASPADA,1,1.000,1.000,,,,,,
+v2,fire/fire_02.jpg,fire,BAHAYA,1,1.000,1.000,smoke_and_flame,none,1.00,BAHAYA|BAHAYA|BAHAYA,,"Terlihat kebakaran hutan aktif berskala besar dengan kobaran api merah membubung tinggi di balik deretan pepohonan. Asap tebal pekat menutupi sebagian besar langit dan mendekati badan jalan, mengindikasikan bahaya kebakaran ekstrem yang sedang berlangsung."
+local,smoke/smoke_01.jpg,smoke,WASPADA,1,0.000,1.000,,,,,,
+v2,smoke/smoke_01.jpg,smoke,BAHAYA,1,0.000,1.000,smoke,none,0.99,BAHAYA|BAHAYA|BAHAYA,,"Terlihat kolom asap masif (pyrocumulus) yang membubung dari kawasan hutan di balik punggungan bukit. Karakteristik gumpalan dan pergerakan konveksi menandakan kebakaran hutan skala besar yang sangat aktif, meski lidah api terhalang topografi."
+local,smoke/smoke_02.jpg,smoke,WASPADA,1,0.012,1.000,,,,,,
+v2,smoke/smoke_02.jpg,smoke,BAHAYA,1,0.012,1.000,smoke,none,0.98,BAHAYA|BAHAYA|BAHAYA,,Terdeteksi asap kebakaran hutan yang nyata dan masif dari lereng gunung. Asap putih keabu-abuan membubung tinggi membentuk kolom besar yang terbawa angin. Api langsung tidak terlihat jelas karena tertutup kepulan asap dan jarak kamera.
+local,fog/fog_01.jpg,fog,WASPADA,0,0.000,1.000,,,,,,
+v2,fog/fog_01.jpg,fog,AMAN,1,0.000,1.000,none,fog_cloud,0.95,AMAN|AMAN|AMAN,,Skor detektor asap 1.00 merupakan alarm palsu. Formasi putih adalah kabut lembah (fog/low cloud) yang menyebar horizontal di sela-sela lereng bukit tanpa adanya titik sumber api maupun karakteristik kolom asap kebakaran.
+local,fog/fog_02.jpg,fog,WASPADA,0,0.000,1.000,,,,,,
+v2,fog/fog_02.jpg,fog,AMAN,1,0.000,1.000,none,fog_cloud,0.95,AMAN|AMAN|AMAN,,"Skor detektor asap merupakan alarm palsu yang dipicu kabut atmosfer tipis di kejauhan atau air terjun di lembah. Vegetasi tampak hijau lebat tanpa tanda kekeringan, kolom asap terpusat, atau aktivitas pembakaran. Tidak ada bahaya kebakaran terdeteksi."
+local,sunset/sunset_01.jpg,sunset,WASPADA,0,1.000,0.000,,,,,,
+v2,sunset/sunset_01.jpg,sunset,AMAN,1,1.000,0.000,none,sunset_glare,0.98,AMAN|AMAN|AMAN,,"Warna oranye menyala pada gambar merupakan efek pencahayaan matahari terbit atau terbenam (sunset glare) pada awan tipis, bukan kobaran api. Skor detektor merupakan alarm palsu akibat saturasi warna langit senja. Tidak terlihat indikasi asap maupun kebakaran di lereng."
+local,sunset/sunset_02.jpg,sunset,WASPADA,0,1.000,0.000,,,,,,
+v2,sunset/sunset_02.jpg,sunset,AMAN,1,1.000,0.000,none,sunset_glare,0.96,AMAN|AMAN|AMAN,,Pendaran jingga dan terang ekstrem berasal dari matahari yang terbenam atau terbit tepat di garis horizon. Detektor lokal keliru mengidentifikasi silau matahari (sunset glare) dan awan yang berpendar sebagai api kebakaran hutan.
+local,lights/lights_01.jpg,lights,WASPADA,0,0.505,0.227,,,,,,
+v2,lights/lights_01.jpg,lights,AMAN,1,0.505,0.227,none,artificial_light,0.95,AMAN|AMAN|AMAN,,"Cahaya terang yang terdeteksi merupakan lampu pemukiman kota di malam/senja hari di antara tebing batu, bukan kobaran api. Tidak terlihat adanya asap atau indikasi kebakaran hutan di area lereng bervegetasi."
+local,lights/lights_02.jpg,lights,WASPADA,0,0.174,0.063,,,,,,
+v2,lights/lights_02.jpg,lights,AMAN,1,0.174,0.063,none,artificial_light,0.96,AMAN|AMAN|AMAN,,"Gambar memperlihatkan suasana jalan raya pada malam/senja hari dengan lampu jalan dan kendaraan. Cahaya terang bersumber murni dari lampu penerangan jalan (artificial light), bukan api kebakaran. Tidak ditemukan indikasi asap maupun api di kawasan lereng bukit."
+local,normal/normal_01.jpg,normal,WASPADA,0,0.001,1.000,,,,,,
+v2,normal/normal_01.jpg,normal,AMAN,1,0.001,1.000,none,fog_cloud,0.95,AMAN|AMAN|AMAN,,Pemandangan menampilkan bentang alam pegunungan hijau dengan langit berawan. Skor asap tinggi dari detektor merupakan alarm palsu yang terpicu oleh awan kumulus normal di langit serta kabut atmosferik tipis di kejauhan. Tidak ada tanda kebakaran.
+local,normal/normal_02.jpg,normal,WASPADA,0,0.000,1.000,,,,,,
+v2,normal/normal_02.jpg,normal,AMAN,1,0.000,1.000,none,none,0.95,AMAN|AMAN|AMAN,,Pemandangan lembah menunjukkan tutupan hutan hijau lebat dan subur. Tidak ditemukan titik api maupun kolom asap kebakaran. Deteksi asap lokal merupakan positif palsu yang dipicu oleh kontras langit berawan yang terang.

@@ -190,6 +190,25 @@ MataKlabat/
 
 ---
 
+## 📊 Hasil Evaluasi (27 Okt 2026)
+
+Test set 72 foto berlisensi bebas (12 per kelas: api, asap, kabut, senja, lampu, normal; sumber di [`data/MEDIA_SOURCES.md`](data/MEDIA_SOURCES.md)). Model `ag/gemini-3.8-flash-high` via 9router, keputusan satu-cek (tanpa jendela konfirmasi). Detail: [`results/`](results/).
+
+| Varian | Precision | Recall | F1 | False alarm kabut / senja / lampu / normal |
+|---|---|---|---|---|
+| Detektor lokal saja (warna) | 0,35 | 1,00 | 0,52 | 100% / 92% / 75% / 100% |
+| + LLM, prompt v1 | 1,00 | 1,00 | 1,00 | 0 / 0 / 0 / 0 |
+| + LLM, prompt v2 | 1,00 | 1,00 | 1,00 | 0 / 0 / 0 / 0 |
+
+- **Dua tahap terbukti perlu:** detektor lokal tidak melewatkan kebakaran, tetapi hampir semua foto lain ikut memicu; LLM menghapus semua false alarm itu tanpa kehilangan satu kejadian pun.
+- **Pengaruh prompt (F5):** v2 menamai jenis lookalike dengan tepat 100% (v1: 89%), tetapi menyebut 92% foto hutan normal "mirip kabut" (v1: 58%): bias dari prompt yang menekankan kabut. Keputusan tetap benar.
+- **Konsistensi (F4):** v2, 12 foto × 3 ulangan: keputusan 100% sama, simpangan baku keyakinan 0,004. Label lookalike untuk foto normal tidak selalu sama antar-ulangan.
+- **Keterbatasan:** sebagian besar foto api/asap adalah kebakaran besar (keyakinan ≥ 0,95). Kasus sulit (asap tipis di kejauhan, kabut asap, malam hari) belum terwakili, jadi skor sempurna ini tidak boleh digeneralisasi.
+
+Ulangi dengan `python scripts/fetch_media.py` lalu `python scripts/evaluate.py --set data/test_set --prompt v1,v2`.
+
+---
+
 ## ⚠️ Keterbatasan
 
 - **Prototipe akademik**, bukan pengganti sistem resmi BPBD, Manggala Agni, atau BMKG.

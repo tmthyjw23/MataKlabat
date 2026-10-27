@@ -1,0 +1,3 @@
+variant,confidence_std_mean,consistency,errors,f1,false_alarm_fog,false_alarm_lights,false_alarm_normal,false_alarm_sunset,lookalike_named_right,n,normal_called_lookalike,precision,recall,recall_any_alert
+local,,,0,0.5,1.0,1.0,1.0,1.0,,12,,0.333,1.0,1.0
+v2,0.004,1.0,0,1.0,0.0,0.0,0.0,0.0,1.0,12,0.5,1.0,1.0,1.0
