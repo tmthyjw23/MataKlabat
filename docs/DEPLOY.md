@@ -65,18 +65,36 @@ grep ^OPERATOR_PASSWORD ~/mataklabat/.env
 
 `TELEGRAM_*` dan `LLM_*` boleh kosong dulu: tanpa Telegram pesan hanya tampil di web (mode kering), tanpa LLM sistem memakai detektor lokal saja (maksimal "Perlu Dicek (belum terverifikasi)", tanpa pesan Telegram).
 
-## 3. AI (9router) di server
+## 3. AI di server: pilih provider + cadangan
 
-9router di laptop (WSL) **tidak** bisa dipakai dari VPS. Pilihan:
+9router di laptop (WSL) **tidak** bisa dipakai dari VPS. Pilih provider dengan `LLM_PROVIDER` (alamat terisi otomatis) dan beri cadangan dengan `LLM_FALLBACKS`. Model harus bisa membaca gambar dan memanggil tool.
 
-1. **Pasang 9router di VPS** (butuh Node 20). Jalankan sebagai service, dengar di `127.0.0.1:20128` saja, lalu login akun provider di dashboard 9router lewat SSH tunnel:
-   ```bash
-   ssh -L 20128:127.0.0.1:20128 timothy@IP_VPS
-   ```
-   lalu buka `http://localhost:20128` di laptop. **Jangan** buka port 20128 ke internet.
-2. Endpoint lain yang OpenAI-compatible dan mendukung gambar + tool calling: isi `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`.
+| Provider | `.env` | Catatan |
+|---|---|---|
+| Google AI Studio | `LLM_PROVIDER=aistudio`, `AISTUDIO_API_KEY=...`, `LLM_MODEL=` model Gemini dari AI Studio | Key gratis di aistudio.google.com/apikey; VPS terdeteksi di Indonesia (didukung) |
+| Ollama di VPS | `LLM_PROVIDER=ollama`, `LLM_MODEL=gemma4:31b-cloud` | Sudah terpasang di VPS tim. Model `*-cloud` dijalankan Ollama Cloud (perlu login `ollama signin`); model lokal tidak muat di RAM 2 GB |
+| 9router di VPS | `LLM_PROVIDER=9router`, `NINEROUTER_API_KEY=...` | Dashboard hanya lewat SSH tunnel: `ssh -L 20128:127.0.0.1:20128 timothy@IP_VPS`. Jangan buka port 20128 ke internet |
+| Lain (OpenRouter, OpenAI, custom) | `openrouter` / `openai` / `custom` + `LLM_BASE_URL` | Endpoint OpenAI-compatible apa pun |
 
-Cek: `.venv/bin/python -m mataklabat check --llm-sample data/demo/bahan/asap_kolom.jpg`.
+Contoh yang dipakai VPS tim (utama Ollama, cadangan 9router):
+
+```ini
+LLM_PROVIDER=ollama
+LLM_MODEL=gemma4:31b-cloud
+NINEROUTER_API_KEY=<key 9router>
+LLM_FALLBACKS=9router:ag/gemini-3.8-flash-high
+```
+
+Endpoint yang gagal (error API, kuota habis, atau jawaban bukan JSON seperti model yang sudah dihentikan) diistirahatkan 5 menit dan berikutnya yang dipakai. Halaman Kesehatan menulis "memakai ..." dan siapa yang sedang istirahat. Kalau **semua** gagal ±5 menit saat ada kamera aktif, grup Telegram menerima satu pesan "AI TIDAK TERSEDIA" (dan satu "AI KEMBALI TERSEDIA" saat pulih).
+
+Cek semua endpoint sekaligus (satu pertanyaan teks per endpoint) lalu satu foto:
+
+```bash
+.venv/bin/python -m mataklabat check
+.venv/bin/python -m mataklabat check --llm-sample data/demo/bahan/asap_kolom.jpg
+```
+
+Setelah mengubah `.env`: `sudo systemctl restart mataklabat`.
 
 Kuota: setiap kamera **aktif** memanggil AI saat ada tanda, saat status naik, dan heartbeat tiap `HEARTBEAT_S` (default 120 dtk). Nonaktifkan kamera yang tidak dipakai. Jangan menjalankan evaluasi penuh (±600 panggilan) menjelang demo.
 

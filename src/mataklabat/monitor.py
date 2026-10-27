@@ -10,6 +10,7 @@ from mataklabat.agent import IncidentAgent, IncidentReporter
 from mataklabat.alerts import AlertService
 from mataklabat.config import Settings, now_local
 from mataklabat.control import CameraControl, ControlWatcher
+from mataklabat.llm import LLMPool
 from mataklabat.notifier import OutboxSender, TelegramClient
 from mataklabat.pipeline import ConsoleSink, Monitor
 from mataklabat.recorder import Recorder
@@ -17,6 +18,7 @@ from mataklabat.risk import RiskService
 from mataklabat.snapshots import SnapshotStore
 from mataklabat.storage import Storage, risk_to_dict
 from mataklabat.tools import IncidentTools
+from mataklabat.vision_llm import VisionVerifier
 
 log = logging.getLogger(__name__)
 
@@ -36,12 +38,14 @@ class Housekeeper:
         monitor_ref: dict[str, Any],
         risk: RiskService | None,
         interval_s: float = HEARTBEAT_S,
+        alerts=None,
     ):
         self.settings = settings
         self.storage = storage
         self.snapshots = snapshots
         self.monitor_ref = monitor_ref
         self.risk = risk
+        self.alerts = alerts
         self.interval_s = interval_s
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -81,11 +85,15 @@ class Housekeeper:
             if monitor.verifier is None:
                 self.storage.set_health("llm", None, "AI nonaktif (LLM_MODEL kosong atau --no-llm), memakai detektor lokal")
             else:
-                failing = [w.camera.id for w in monitor.workers if w.active and w._llm_failed]
-                detail = f"{self.settings.llm_model} @ {self.settings.llm_base_url}"
+                active = [w for w in monitor.workers if w.active]
+                failing = [w.camera.id for w in active if w._llm_failed]
+                detail = llm_detail(monitor.verifier.pool.status())
                 if failing:
-                    detail += f"; gagal untuk {', '.join(failing)}"
+                    detail += f"; tidak ada AI yang menjawab untuk {', '.join(failing)}"
                 self.storage.set_health("llm", not failing, detail)
+                if self.alerts is not None:
+                    # None = no camera is asking the AI, so nothing is known about it.
+                    self.alerts.on_ai_status(bool(failing) if active else None, detail)
 
     def prune(self) -> None:
         removed = self.storage.prune(now_local(), self.settings.event_keep_days)
@@ -107,6 +115,18 @@ class Housekeeper:
             elapsed += self.interval_s
 
 
+def llm_detail(status: dict[str, Any]) -> str:
+    """One line for the health page: which endpoint answers, which ones rest."""
+    order = status["order"]
+    active = status["active"] or order[0]
+    text = f"memakai {active}"
+    if len(order) > 1:
+        text += f" (urutan: {' → '.join(order)})"
+    if status["resting"]:
+        text += "; istirahat: " + ", ".join(f"{k} ({v})" for k, v in status["resting"].items())
+    return text
+
+
 def build_monitor(settings: Settings, with_weather: bool = True, verifier=None) -> Monitor:
     storage = Storage(settings.db_path)
     snapshots = SnapshotStore(settings.snapshot_dir, settings.snapshot_archive_max_mb)
@@ -119,7 +139,11 @@ def build_monitor(settings: Settings, with_weather: bool = True, verifier=None) 
 
     alerts = AlertService(settings, storage, risk_provider=risk_provider)
     tools = IncidentTools(settings, risk_provider, recent_events=storage.recent_events)
-    agent = IncidentAgent(settings, tools) if settings.llm_enabled else None
+    # One pool for vision and agent: an endpoint found dead by one is skipped by both.
+    pool = LLMPool(settings.llm_chain, settings.llm_timeout_s) if settings.llm_enabled else None
+    if verifier is None and pool is not None:
+        verifier = VisionVerifier(settings, pool=pool)
+    agent = IncidentAgent(settings, tools, pool=pool) if pool is not None else None
     reporter = IncidentReporter(settings, storage, tools, alerts.enqueue_report, agent)
     alerts.report_requester = reporter.request
     if risk is not None:
@@ -132,7 +156,7 @@ def build_monitor(settings: Settings, with_weather: bool = True, verifier=None) 
     recorder = Recorder(storage, snapshots, settings.cameras, listeners=[alerts, reporter])
     control = ControlWatcher(CameraControl(settings.control_db_path, settings.cameras))
     monitor_ref: dict[str, Any] = {}
-    services += [control, Housekeeper(settings, storage, snapshots, monitor_ref, risk)]
+    services += [control, Housekeeper(settings, storage, snapshots, monitor_ref, risk, alerts=alerts)]
     monitor = Monitor(
         settings, sinks=[ConsoleSink(), recorder], verifier=verifier, risk=risk, services=services,
         is_enabled=control.enabled,

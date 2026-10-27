@@ -106,18 +106,37 @@ def check_cameras(settings: Settings, wait_s: float = 6.0) -> list[CheckRow]:
 
 
 def check_llm(settings: Settings, client=None) -> CheckRow:
+    """The primary endpoint only (see check_llm_chain for all of them)."""
     if not settings.llm_enabled:
         return ("LLM", False, "LLM_MODEL kosong, sistem hanya memakai detektor lokal")
+    verifier = VisionVerifier(settings, client=client)
+    return _check_endpoint("LLM", verifier.pool.primary, verifier.client)
+
+
+def check_llm_chain(settings: Settings) -> list[CheckRow]:
+    """Primary and every fallback from LLM_FALLBACKS, one short text question each."""
+    if not settings.llm_enabled:
+        return [check_llm(settings)]
+    pool = VisionVerifier(settings).pool
+    return [
+        _check_endpoint("LLM" if i == 0 else f"LLM cadangan {i}", ep, pool.client(ep))
+        for i, ep in enumerate(pool.endpoints)
+    ]
+
+
+def _check_endpoint(name: str, ep, client) -> CheckRow:
+    where = f"{ep.label} @ {ep.base_url}"
     try:
-        client = client or VisionVerifier(settings).client
         reply = client.chat.completions.create(
-            model=settings.llm_model,
+            model=ep.model,
             messages=[{"role": "user", "content": "Jawab hanya dengan satu kata: OK"}],
         )
         text = (reply.choices[0].message.content or "").strip()
-        return ("LLM", True, f"{settings.llm_model} @ {settings.llm_base_url} menjawab {text[:20]!r}")
+        # A retired model can answer 200 with a notice instead of "OK"; show it.
+        ok = "ok" in text.lower()[:20]
+        return (name, ok, f"{where} menjawab {text[:60]!r}")
     except Exception as exc:  # noqa: BLE001 - any SDK/network error is reported, not raised
-        return ("LLM", False, f"{settings.llm_model} @ {settings.llm_base_url}: {_short_error(exc)}")
+        return (name, False, f"{where}: {_short_error(exc)}")
 
 
 def cmd_llm_sample(settings: Settings, image_path: Path, prompt_version: str | None) -> int:
@@ -196,7 +215,7 @@ def cmd_check(settings: Settings) -> int:
     print("Menguji kamera...")
     rows = check_cameras(settings)
     first = settings.cameras[0]
-    rows += [check_llm(settings), check_open_meteo(first.lat, first.lon), check_telegram(settings)]
+    rows += [*check_llm_chain(settings), check_open_meteo(first.lat, first.lon), check_telegram(settings)]
 
     symbols = {True: "✅", False: "❌", None: "➖"}
     for name, ok, detail in rows:

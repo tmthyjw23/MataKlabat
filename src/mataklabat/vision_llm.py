@@ -22,6 +22,7 @@ import openai
 
 from mataklabat.camera import Frame
 from mataklabat.config import Settings
+from mataklabat.llm import LLMEndpoint, LLMPool, pool_from_settings
 from mataklabat.prompts import PromptContext, build_prompt
 
 log = logging.getLogger(__name__)
@@ -211,17 +212,22 @@ def encode_jpeg(image: np.ndarray, max_side: int = MAX_IMAGE_SIDE, quality: int 
 
 
 class VisionVerifier:
-    def __init__(self, settings: Settings, client: Any = None, limiter: RateLimiter | None = None):
+    """Asks the endpoints of an LLMPool in order; one that errors or keeps answering
+    off-contract rests and the next one answers (llm.py)."""
+
+    def __init__(
+        self,
+        settings: Settings,
+        client: Any = None,
+        limiter: RateLimiter | None = None,
+        pool: LLMPool | None = None,
+    ):
         self.settings = settings
-        self.model = settings.llm_model or ""
-        self.client = client or openai.OpenAI(
-            base_url=settings.llm_base_url,
-            api_key=settings.llm_api_key or "tanpa-key",
-            timeout=settings.llm_timeout_s,
-            max_retries=0,  # the decision engine retries on its own schedule
-        )
+        self.pool = pool or pool_from_settings(settings, settings.llm_timeout_s, client)
+        self.model = self.pool.primary.model
+        self.client = self.pool.client(self.pool.primary)
         self.limiter = limiter or RateLimiter(settings.llm_min_interval_s)
-        self._structured_output = True
+        self._structured_output: dict[str, bool] = {}
 
     def verify(
         self,
@@ -249,29 +255,38 @@ class VisionVerifier:
         image_url = "data:image/jpeg;base64," + base64.b64encode(encode_jpeg(image)).decode("ascii")
         prompt = build_prompt(version, ctx)
         started = time.monotonic()
+        verdict = None
+        for ep in self.pool.candidates():
+            verdict = self._ask(ep, prompt, image_url, version, started)
+            if verdict.ok:
+                self.pool.mark_ok(ep)
+                return verdict
+            self.pool.mark_failed(ep, verdict.error or "gagal")
+        return verdict
 
+    def _ask(self, ep: LLMEndpoint, prompt: str, image_url: str, version: str, started: float) -> LLMVerdict:
         for attempt in (1, 2):  # §5.1: one retry when the reply cannot be parsed
             try:
-                text = self._complete(prompt, image_url)
+                text = self._complete(ep, prompt, image_url)
             except openai.APIError as exc:
-                log.warning("LLM gagal (%s): %s", self.model, exc)
+                log.warning("LLM gagal (%s): %s", ep.label, exc)
                 return LLMVerdict.failed(
-                    f"api_error: {type(exc).__name__}", version, self.model, time.monotonic() - started
+                    f"api_error: {type(exc).__name__}", version, ep.model, time.monotonic() - started
                 )
             try:
                 fields = parse_verdict(text)
             except VerdictParseError as exc:
-                log.warning("Jawaban LLM tidak sesuai skema (percobaan %d): %s", attempt, exc)
+                log.warning("Jawaban LLM %s tidak sesuai skema (percobaan %d): %s", ep.label, attempt, exc)
                 continue
             return LLMVerdict(
                 **fields,
                 prompt_version=version,
-                model=self.model,
+                model=ep.model,
                 latency_s=round(time.monotonic() - started, 2),
             )
-        return LLMVerdict.failed("parse_failed", version, self.model, time.monotonic() - started)
+        return LLMVerdict.failed("parse_failed", version, ep.model, time.monotonic() - started)
 
-    def _complete(self, prompt: str, image_url: str) -> str:
+    def _complete(self, ep: LLMEndpoint, prompt: str, image_url: str) -> str:
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {
@@ -282,9 +297,10 @@ class VisionVerifier:
                 ],
             },
         ]
-        if self._structured_output:
+        if self._structured_output.get(ep.label, True):
             try:
                 return self._create(
+                    ep,
                     messages,
                     response_format={
                         "type": "json_schema",
@@ -293,12 +309,12 @@ class VisionVerifier:
                 )
             except openai.BadRequestError as exc:
                 # Some providers reject json_schema; fall back to the system-prompt contract.
-                log.warning("Endpoint menolak response_format (%s); lanjut tanpa structured output.", exc)
-                self._structured_output = False
-        return self._create(messages)
+                log.warning("%s menolak response_format (%s); lanjut tanpa structured output.", ep.label, exc)
+                self._structured_output[ep.label] = False
+        return self._create(ep, messages)
 
-    def _create(self, messages: list[dict], **kwargs: Any) -> str:
-        resp = self.client.chat.completions.create(model=self.model, messages=messages, **kwargs)
+    def _create(self, ep: LLMEndpoint, messages: list[dict], **kwargs: Any) -> str:
+        resp = self.pool.client(ep).chat.completions.create(model=ep.model, messages=messages, **kwargs)
         return resp.choices[0].message.content or ""
 
 

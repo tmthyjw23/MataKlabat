@@ -20,6 +20,7 @@ import openai
 from mataklabat import messages
 from mataklabat.config import CameraConfig, Settings
 from mataklabat.decision import Decision
+from mataklabat.llm import LLMEndpoint, LLMPool, pool_from_settings
 from mataklabat.storage import Storage
 from mataklabat.tools import TOOL_SCHEMAS, IncidentTools
 
@@ -59,18 +60,33 @@ class AgentError(Exception):
 
 
 class IncidentAgent:
-    def __init__(self, settings: Settings, tools: IncidentTools, client: Any = None):
+    """Tool-calling agent. When an endpoint fails with an API error, the whole report
+    is started again on the next endpoint of the pool (llm.py)."""
+
+    def __init__(self, settings: Settings, tools: IncidentTools, client: Any = None, pool: LLMPool | None = None):
         self.settings = settings
         self.tools = tools
-        self.client = client or openai.OpenAI(
-            base_url=settings.llm_base_url,
-            api_key=settings.llm_api_key or "tanpa-key",
-            timeout=settings.agent_timeout_s,
-            max_retries=0,
-        )
+        self.pool = pool or pool_from_settings(settings, settings.agent_timeout_s, client)
 
     def run(self, camera: CameraConfig, decision: Decision) -> Report:
         deadline = time.monotonic() + self.settings.agent_timeout_s
+        error: Exception | None = None
+        for ep in self.pool.candidates():
+            if time.monotonic() >= deadline:
+                break
+            try:
+                report = self._run(ep, camera, decision, deadline)
+            except openai.APIError as exc:
+                self.pool.mark_failed(ep, f"api_error: {type(exc).__name__}")
+                error = exc
+                continue
+            self.pool.mark_ok(ep)
+            return report
+        if isinstance(error, openai.APIError):
+            raise error
+        raise AgentError("melewati batas waktu agent")
+
+    def _run(self, ep: LLMEndpoint, camera: CameraConfig, decision: Decision, deadline: float) -> Report:
         msgs: list[dict[str, Any]] = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": incident_brief(camera, decision)},
@@ -80,8 +96,8 @@ class IncidentAgent:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise AgentError("melewati batas waktu agent")
-            resp = self.client.chat.completions.create(
-                model=self.settings.llm_model,
+            resp = self.pool.client(ep).chat.completions.create(
+                model=ep.model,
                 messages=msgs,
                 tools=TOOL_SCHEMAS,
                 timeout=remaining,

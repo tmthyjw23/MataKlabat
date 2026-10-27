@@ -166,6 +166,30 @@ def risk_rise_alert(risk: dict, previous_level: str | None, public_url: str | No
     return fit("\n".join(lines), MESSAGE_LIMIT)
 
 
+def ai_down_notice(detail: str, down_s: float, public_url: str | None = None) -> str:
+    lines = [
+        "⚙️ AI TIDAK TERSEDIA — MataKlabat",
+        f"Sudah ±{max(1, round(down_s / 60))} menit tidak ada model AI yang menjawab.",
+        "",
+        "Akibatnya: kamera tetap memantau dengan detektor lokal, tetapi status \"Perlu Dicek",
+        "(belum terverifikasi)\" hanya tampil di dashboard dan TIDAK dikirim ke grup ini.",
+        "Ini bukan peringatan kebakaran.",
+        "",
+        f"Detail: {shorten(detail, 300)}",
+        "Tindakan: cek kuota/model AI, atau pantau dashboard secara langsung.",
+        *_footer(public_url),
+    ]
+    return fit("\n".join(lines), MESSAGE_LIMIT)
+
+
+def ai_up_notice(detail: str, down_s: float) -> str:
+    return fit("\n".join([
+        "✅ AI KEMBALI TERSEDIA — MataKlabat",
+        f"Setelah ±{max(1, round(down_s / 60))} menit, verifikasi AI berjalan lagi; peringatan kamera dikirim seperti biasa.",
+        f"Detail: {shorten(detail, 300)}",
+    ]), MESSAGE_LIMIT)
+
+
 def morning_summary(risk: dict | None, cameras: list[dict], when: datetime, public_url: str | None = None) -> str:
     lines = [f"☀️ RINGKASAN PAGI MATAKLABAT — {format_time(when)}", ""]
     if risk:

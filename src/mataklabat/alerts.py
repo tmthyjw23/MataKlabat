@@ -7,6 +7,8 @@ Tiers:
   the alert goes out only if the AI later confirms the check at the same camera.
 - Area risk: when the level rises to Tinggi or Sangat Tinggi.
 - Morning summary: once a day at MORNING_SUMMARY_AT.
+- AI status: one notice when no AI endpoint has answered for AI_DOWN_NOTICE_S while
+  cameras are on (camera checks are then held on the dashboard), one when it is back.
 """
 
 from __future__ import annotations
@@ -30,6 +32,7 @@ HIGH_LEVELS = ("Tinggi", "Sangat Tinggi")
 MORNING_CHECK_S = 30.0
 MORNING_WINDOW = timedelta(hours=3)
 MORNING_WAIT_FOR_WEATHER = timedelta(minutes=15)
+AI_DOWN_NOTICE_S = 300.0
 
 ReportRequester = Callable[[int, Decision, Path | None], None]
 
@@ -53,6 +56,8 @@ class AlertService:
         self._wall = wall_clock
         self._last_check_alert: dict[str, float] = {}
         self._held_unverified: set[str] = set()
+        self._ai_down_since: float | None = None
+        self._ai_down_notified = False
         self._previous_risk: str | None = storage.current_risk_level()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -129,6 +134,26 @@ class AlertService:
 
     def on_incident_closed(self, incident_id: int, decision: Decision) -> None:
         log.info("%s: insiden #%d selesai (kembali Normal).", decision.camera_id, incident_id)
+
+    # --- AI status (Housekeeper) ----------------------------------------------------------
+
+    def on_ai_status(self, failing: bool | None, detail: str) -> None:
+        """failing=None: no camera is on, so nothing is known; the state is kept."""
+        if failing is None:
+            return
+        now = self._clock()
+        if failing:
+            if self._ai_down_since is None:
+                self._ai_down_since = now
+            if not self._ai_down_notified and now - self._ai_down_since >= AI_DOWN_NOTICE_S:
+                self._ai_down_notified = True
+                self._enqueue("system", messages.ai_down_notice(detail, now - self._ai_down_since, self.settings.public_url))
+            return
+        if self._ai_down_notified:
+            since = now if self._ai_down_since is None else self._ai_down_since
+            self._enqueue("system", messages.ai_up_notice(detail, now - since))
+        self._ai_down_since = None
+        self._ai_down_notified = False
 
     # --- risk listener --------------------------------------------------------------------
 

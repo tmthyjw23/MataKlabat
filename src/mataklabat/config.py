@@ -91,6 +91,9 @@ class Settings:
     llm_model: str | None = None
     llm_enabled: bool = False
     prompt_version: str = "v2"
+    llm_provider: str = "custom"
+    # Primary first, then LLM_FALLBACKS. Empty = only llm_base_url/llm_model.
+    llm_endpoints: tuple = field(default=(), repr=False)
 
     # Notifications and optional integrations
     telegram_bot_token: str | None = field(default=None, repr=False)
@@ -153,6 +156,15 @@ class Settings:
         return self.runtime_dir / "snapshots"
 
     @property
+    def llm_chain(self) -> tuple:
+        """Endpoints in failover order (llm.LLMEndpoint)."""
+        if self.llm_endpoints:
+            return self.llm_endpoints
+        from mataklabat.llm import LLMEndpoint
+
+        return (LLMEndpoint(self.llm_provider, self.llm_base_url, self.llm_model or "", self.llm_api_key),)
+
+    @property
     def control_db_path(self) -> Path:
         """Operator choices (camera on/off). Written only by the web, read by the monitor."""
         return self.runtime_dir / "control.db"
@@ -193,6 +205,7 @@ def load_settings(
     resources = _load_resources(root / "config" / "resources.yaml")
 
     llm_model = _env_str("LLM_MODEL")
+    provider, base_url, api_key, endpoints = _llm_endpoints(llm_model)
     if llm_model is None:
         log.warning(
             "LLM_MODEL kosong: verifikasi LLM dan AI Agent dimatikan, "
@@ -211,10 +224,12 @@ def load_settings(
         root=root,
         cameras=cameras,
         resources=resources,
-        llm_base_url=(_env_str("LLM_BASE_URL") or DEFAULT_LLM_BASE_URL).rstrip("/"),
-        llm_api_key=_env_str("LLM_API_KEY"),
+        llm_base_url=base_url,
+        llm_api_key=api_key,
         llm_model=llm_model,
         llm_enabled=llm_model is not None,
+        llm_provider=provider,
+        llm_endpoints=endpoints,
         prompt_version=prompt_version,
         telegram_bot_token=_env_str("TELEGRAM_BOT_TOKEN"),
         telegram_chat_id=_env_str("TELEGRAM_CHAT_ID"),
@@ -230,6 +245,60 @@ def load_settings(
     )
     _validate(settings)
     return settings
+
+
+def _provider_base(name: str, where: str) -> tuple[str, str | None]:
+    from mataklabat.llm import PROVIDERS
+
+    if name not in PROVIDERS:
+        raise ConfigError(f"{where}: provider {name!r} tidak dikenal. Pilihan: {', '.join(PROVIDERS)}.")
+    base, key_env = PROVIDERS[name]
+    if base is None:
+        base = _env_str("CUSTOM_BASE_URL") or _env_str("LLM_BASE_URL")
+        if base is None:
+            raise ConfigError(f"{where}: provider 'custom' butuh LLM_BASE_URL (atau CUSTOM_BASE_URL).")
+    return base.rstrip("/"), key_env
+
+
+def _llm_endpoints(model: str | None) -> tuple[str, str, str | None, tuple]:
+    """Primary endpoint (provider, base URL, key) and the full failover chain.
+
+    Without LLM_PROVIDER the old settings apply unchanged: LLM_BASE_URL (default
+    9router) and LLM_API_KEY.
+    """
+    from mataklabat.llm import LLMEndpoint
+
+    provider = (_env_str("LLM_PROVIDER") or "").lower()
+    if provider:
+        # A preset fixes the address; leftover LLM_BASE_URL/LLM_API_KEY from another
+        # provider must not win, so the provider's own key variable comes first.
+        base, key_env = _provider_base(provider, "LLM_PROVIDER")
+        key = (_env_str(key_env) if key_env else None) or _env_str("LLM_API_KEY")
+    else:
+        provider = "9router" if not _env_str("LLM_BASE_URL") else "custom"
+        base = (_env_str("LLM_BASE_URL") or DEFAULT_LLM_BASE_URL).rstrip("/")
+        key = _env_str("LLM_API_KEY")
+
+    chain = []
+    if model is not None:
+        chain.append(LLMEndpoint(provider, base, model, key))
+    for raw in (_env_str("LLM_FALLBACKS") or "").split(","):
+        item = raw.strip()
+        if not item:
+            continue
+        name, sep, fb_model = item.partition(":")
+        name, fb_model = name.strip().lower(), fb_model.strip()
+        if not sep or not fb_model:
+            raise ConfigError(f"LLM_FALLBACKS: {item!r} harus berformat provider:model, misal ollama:gemma4:31b-cloud.")
+        if name == provider:
+            fb_base, fb_key = base, key
+        else:
+            fb_base, key_env = _provider_base(name, "LLM_FALLBACKS")
+            fb_key = _env_str(key_env) if key_env else None
+        chain.append(LLMEndpoint(name, fb_base, fb_model, fb_key))
+    if model is None and chain:
+        raise ConfigError("LLM_FALLBACKS diisi tapi LLM_MODEL kosong; isi model utama dulu.")
+    return provider, base, key, tuple(chain)
 
 
 def _under_root(root: Path, value: str) -> Path:
