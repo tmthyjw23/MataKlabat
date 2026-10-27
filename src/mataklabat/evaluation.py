@@ -61,12 +61,14 @@ class Prediction:
         return self.alarm == self.positive_truth
 
 
-def list_images(test_set: Path) -> list[tuple[str, Path]]:
+def list_images(test_set: Path, per_class: int | None = None) -> list[tuple[str, Path]]:
+    """Images per class, sorted by name; `per_class` keeps only the first N of each class."""
     items = []
     for label in CLASSES:
         folder = test_set / label
         if folder.is_dir():
-            items += [(label, p) for p in sorted(folder.iterdir()) if p.suffix.lower() in IMAGE_EXTENSIONS]
+            files = [p for p in sorted(folder.iterdir()) if p.suffix.lower() in IMAGE_EXTENSIONS]
+            items += [(label, p) for p in files[:per_class]]
     return items
 
 
@@ -96,10 +98,11 @@ def evaluate(
     verify: Callable[[np.ndarray, PromptContext, str], LLMVerdict] | None,
     repeat: int = 1,
     progress: Callable[[str], None] = lambda msg: None,
+    per_class: int | None = None,
 ) -> list[Prediction]:
     detector = ColorMotionDetector(settings.fire_gain, settings.smoke_gain, use_motion=False)
     predictions: list[Prediction] = []
-    images = list_images(test_set)
+    images = list_images(test_set, per_class)
     for i, (label, path) in enumerate(images, start=1):
         image = read_image(path)
         if image is None:

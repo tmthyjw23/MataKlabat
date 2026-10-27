@@ -79,3 +79,9 @@ def test_failure_groups():
     assert failure_group(Prediction("v2", "f", "lights", "BAHAYA")) == "F2"
     assert failure_group(Prediction("v2", "f", "smoke", "AMAN")) == "F3"
     assert failure_group(Prediction("v2", "f", "normal", "AMAN")) is None
+
+
+def test_per_class_limit(test_set):
+    settings = Settings(root=".", cameras=(), resources=Resources())
+    preds = evaluate(test_set, settings, ["local"], None, per_class=1)
+    assert len(preds) == 6 and {p.file.split("/")[1] for p in preds} == {"0.png"}

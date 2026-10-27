@@ -27,6 +27,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repeat", type=int, default=1, help="Ulangi panggilan LLM per gambar (uji konsistensi).")
     parser.add_argument("--no-llm", action="store_true", help="Hanya detektor lokal.")
     parser.add_argument("--interval", type=float, help="Jeda minimum antar panggilan LLM (default LLM_MIN_INTERVAL_S).")
+    parser.add_argument("--per-class", type=int, help="Hanya N gambar pertama per kelas (misal untuk uji konsistensi).")
     parser.add_argument("--out", type=Path, default=Path("results"), help="Folder hasil.")
     args = parser.parse_args(argv)
 
@@ -36,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Konfigurasi tidak valid: {exc}", file=sys.stderr)
         return 2
 
-    images = list_images(args.set)
+    images = list_images(args.set, args.per_class)
     if not images:
         print(f"Tidak ada gambar di {args.set}/<kelas>/ (kelas: {', '.join(CLASSES)}).", file=sys.stderr)
         return 1
@@ -56,7 +57,7 @@ def main(argv: list[str] | None = None) -> int:
     small = [c for c, n in counts.items() if n < 10]
     if small:
         print(f"Peringatan: kurang dari 10 gambar untuk {', '.join(small)}.")
-    predictions = evaluate(args.set, settings, variants, verify, args.repeat, progress=print)
+    predictions = evaluate(args.set, settings, variants, verify, args.repeat, progress=print, per_class=args.per_class)
     paths = write_outputs(predictions, args.out)
     print()
     for row in metrics(predictions):
