@@ -102,3 +102,11 @@ def test_failed_llm_calls_are_excluded_and_stop_the_run(test_set):
     assert row["errors"] == 1 and row["n"] == 11
     with pytest.raises(LLMUnavailable, match="9router"):
         evaluate(test_set, settings, ["v2"], lambda *a: LLMVerdict.failed("api_error: APIConnectionError", "v2"))
+
+
+def test_cli_script_compiles():
+    import py_compile
+    from pathlib import Path
+
+    py_compile.compile(str(Path(__file__).resolve().parents[1] / "scripts" / "evaluate.py"), doraise=True)
+    py_compile.compile(str(Path(__file__).resolve().parents[1] / "scripts" / "fetch_media.py"), doraise=True)

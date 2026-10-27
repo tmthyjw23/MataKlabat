@@ -60,8 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         predictions = evaluate(args.set, settings, variants, verify, args.repeat, progress=print, per_class=args.per_class)
     except LLMUnavailable as exc:
-        print(f"
-Evaluasi dihentikan: {exc}", file=sys.stderr)
+        print(f"\nEvaluasi dihentikan: {exc}", file=sys.stderr)
         return 3
     paths = write_outputs(predictions, args.out)
     print()
