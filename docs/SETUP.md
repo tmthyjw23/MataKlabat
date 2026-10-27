@@ -41,6 +41,8 @@ pip install -e .
 
 Cek: `python -m mataklabat --help` menampilkan `{up,run,web,check}`.
 
+Sudah pernah memasang sebelum 28 Okt 2026? OpenCV diganti ke versi headless; sekali saja jalankan `pip uninstall -y opencv-python` lalu `pip install -e .` lagi.
+
 Unduh foto test set, foto demo, dan video (sumber + lisensi di `data/MEDIA_SOURCES.md`):
 
 ```bash
@@ -113,6 +115,12 @@ python -m mataklabat check --llm-sample data/test_set/fire/fire_03.jpg
 ```
 
 Harus muncul `"fire_visible": true` dan alasan dalam Bahasa Indonesia.
+
+## 6b. Mode operator (kamera aktif/nonaktif)
+
+Isi `OPERATOR_PASSWORD` di `.env` (minimal 10 karakter). Di dashboard muncul tombol **Masuk operator**; setelah masuk, setiap kartu kamera punya tombol **Aktifkan/Nonaktifkan**, dan Kamera Foto punya **Pilih foto** (galeri dari `data/demo/bahan`). Kamera nonaktif tidak memakai AI dan tidak mengirim Telegram; menonaktifkan kamera me-reset statusnya ke Normal. Tanpa `OPERATOR_PASSWORD`, website hanya-baca seperti sebelumnya dan kamera mengikuti `enabled:` di file kamera.
+
+Untuk VPS/server: [`DEPLOY.md`](DEPLOY.md).
 
 ## 7. Jalankan
 

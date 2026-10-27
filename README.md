@@ -66,7 +66,7 @@ Detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) dan spec v2 [`docs/superp
 
 ## 🚀 Quick Start
 
-> Panduan lengkap langkah demi langkah untuk tim (9router, Telegram, cek, latihan demo, masalah umum): [`docs/SETUP.md`](docs/SETUP.md).
+> Panduan lengkap langkah demi langkah untuk tim (9router, Telegram, cek, latihan demo, masalah umum): [`docs/SETUP.md`](docs/SETUP.md). Pasang di VPS untuk demo online (systemd, nginx, Cloudflare, mode operator): [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ### Prasyarat
 - Python **3.11+**
