@@ -66,6 +66,8 @@ Detail: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) dan spec v2 [`docs/superp
 
 ## 🚀 Quick Start
 
+> Panduan lengkap langkah demi langkah untuk tim (9router, Telegram, cek, latihan demo, masalah umum): [`docs/SETUP.md`](docs/SETUP.md).
+
 ### Prasyarat
 - Python **3.11+**
 - Webcam (opsional)

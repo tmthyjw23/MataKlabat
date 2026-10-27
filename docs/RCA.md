@@ -105,12 +105,12 @@ Kemarau, angin kencang, medan curam, dan karakter api bawah tanah. Faktor-faktor
 | Penyebab (Fishbone) | Fitur MataKlabat yang menjawab |
 |---|---|
 | Satelit buta saat berawan | Kamera darat di bawah awan dan sudah bekerja sebelum asap tebal |
-| Titik api baru terlambat diketahui | Pemantauan kontinu multi-kamera. Status BAHAYA ≤ 30 detik (target) |
+| Titik api baru terlambat diketahui | Pemantauan kontinu multi-kamera. Kebakaran Terdeteksi ±35 detik setelah gambar masuk (gladi 27 Okt 2026) |
 | Deteksi bergantung laporan warga | Deteksi otomatis + notifikasi Telegram ke posko dan Hukum Tua |
 | Angin kencang mempercepat sebaran | Agent menghitung **arah sebaran** dari angin real-time dan menyebut **desa terancam** |
 | Koordinasi reaktif / belum ada SOP | Laporan insiden terstruktur (bukti, risiko, rekomendasi, pihak yang dihubungi) sebagai bahan SOP |
-| Kemarau dan bahan bakar kering | **Fire Risk Index** harian, sehingga ambang deteksi lebih sensitif saat risiko tinggi |
-| Api unggun / pembakaran (A) | Status **WASPADA–POTENSI** jika LLM melihat api unggun/pembakaran sebelum menjadi kebakaran |
+| Kemarau dan bahan bakar kering | **Risiko Kebakaran Kawasan** harian (FWI + kelas FDRS Indonesia), sehingga ambang deteksi lebih sensitif saat risiko Tinggi/Sangat Tinggi |
+| Api unggun / pembakaran (A) | Status **Perlu Dicek (potensi)** jika AI melihat api kecil terkendali (api unggun, pembakaran sampah/daun) sebelum menjadi kebakaran |
 | Dugaan kesengajaan | Snapshot berstempel waktu dan log event sebagai jejak bukti |
 | Medan, armada, air | ❌ **Tidak diselesaikan** sistem. Masuk rekomendasi institusi §7 |
 
@@ -122,8 +122,8 @@ Kemarau, angin kencang, medan curam, dan karakter api bawah tanah. Faktor-faktor
 |---|---|---|---|
 | 1 | **BPBD Minahasa Utara** | Pasang 3–4 kamera pantau di titik pandang tinggi (sekitar Kaki Dian, jalur pendakian, Tatelu, Matungkas–Laikit) yang terhubung ke posko. Jadikan peringatan otomatis sebagai pemicu SOP respons awal ≤ 30 menit | Akar masalah §5.1 |
 | 2 | **Dinas Kehutanan Sulut & Manggala Agni** | Gabungkan data satelit (FIRMS/SiPongi) dengan kamera darat. Satelit untuk cakupan luas, kamera untuk verifikasi cepat saat berawan | Kutipan Kadishut soal awan |
-| 3 | **Pemerintah Desa** (Tatelu, Matungkas, Laikit, Airmadidi) | Bangun sekat api **sebelum** musim kemarau berdasarkan Fire Risk Index, bukan setelah api mendekat. Bentuk grup Telegram/WA peringatan desa | Sekat api reaktif [S] |
-| 4 | **Pengelola jalur pendakian Klabat** | Larangan api unggun saat FRI TINGGI, ditegakkan dengan pengumuman di pos dan pemantauan kamera | Faktor risiko manusia (A) |
+| 3 | **Pemerintah Desa** (Tatelu, Matungkas, Laikit, Airmadidi) | Bangun sekat api **sebelum** musim kemarau berdasarkan Risiko Kebakaran Kawasan, bukan setelah api mendekat. Bentuk grup Telegram/WA peringatan desa | Sekat api reaktif [S] |
+| 4 | **Pengelola jalur pendakian Klabat** | Larangan api unggun saat Risiko Kawasan Tinggi/Sangat Tinggi, ditegakkan dengan pengumuman di pos dan pemantauan kamera | Faktor risiko manusia (A) |
 | 5 | **Pemkab Minut** | Anggarkan tandon air dan jalur pemadaman di lereng bawah, serta jadwalkan pembersihan bahan bakar kering | Kendala medan dan air [S] |
 | 6 | **UNKLAB / FILKOM** | Lanjutkan prototipe sebagai proyek riset/pengabdian: uji lapangan 1 kamera di kampus yang menghadap Klabat | Keberlanjutan |
 
