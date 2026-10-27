@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from mataklabat.config import ConfigError, load_settings
-from mataklabat.evaluation import CLASSES, evaluate, list_images, metrics, write_outputs
+from mataklabat.evaluation import CLASSES, LLMUnavailable, evaluate, list_images, metrics, write_outputs
 from mataklabat.vision_llm import RateLimiter, VisionVerifier
 
 
@@ -57,7 +57,12 @@ def main(argv: list[str] | None = None) -> int:
     small = [c for c, n in counts.items() if n < 10]
     if small:
         print(f"Peringatan: kurang dari 10 gambar untuk {', '.join(small)}.")
-    predictions = evaluate(args.set, settings, variants, verify, args.repeat, progress=print, per_class=args.per_class)
+    try:
+        predictions = evaluate(args.set, settings, variants, verify, args.repeat, progress=print, per_class=args.per_class)
+    except LLMUnavailable as exc:
+        print(f"
+Evaluasi dihentikan: {exc}", file=sys.stderr)
+        return 3
     paths = write_outputs(predictions, args.out)
     print()
     for row in metrics(predictions):

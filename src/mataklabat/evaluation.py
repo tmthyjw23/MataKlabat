@@ -31,6 +31,11 @@ LOOKALIKE_CLASSES = ("fog", "sunset", "lights")
 CLASSES = POSITIVE_CLASSES + LOOKALIKE_CLASSES + ("normal",)
 LEVELS = ("AMAN", "WASPADA", "BAHAYA")
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".bmp")
+MAX_CONSECUTIVE_ERRORS = 3
+
+
+class LLMUnavailable(RuntimeError):
+    """The LLM failed on several images in a row; results would be meaningless."""
 
 
 @dataclass
@@ -103,6 +108,7 @@ def evaluate(
     detector = ColorMotionDetector(settings.fire_gain, settings.smoke_gain, use_motion=False)
     predictions: list[Prediction] = []
     images = list_images(test_set, per_class)
+    consecutive_errors = 0
     for i, (label, path) in enumerate(images, start=1):
         image = read_image(path)
         if image is None:
@@ -118,6 +124,15 @@ def evaluate(
                 raise RuntimeError("LLM tidak aktif: isi LLM_MODEL atau pakai --no-llm")
             ctx = PromptContext("Kamera evaluasi (test set)", 0.0, now_local(), local.fire_score, local.smoke_score)
             runs = [verify(image, ctx, variant) for _ in range(max(1, repeat))]
+            if all(not r.ok for r in runs):
+                consecutive_errors += 1
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                    raise LLMUnavailable(
+                        f"{consecutive_errors} gambar berturut-turut gagal dicek LLM ({runs[0].error}). "
+                        "Pastikan 9router berjalan, lalu ulangi."
+                    )
+            else:
+                consecutive_errors = 0
             first = runs[0]
             predictions.append(Prediction(
                 variant, name, label, one_shot_level(first, settings), local.fire_score, local.smoke_score,
@@ -137,7 +152,9 @@ def metrics(predictions: list[Prediction]) -> list[dict[str, Any]]:
     by_variant: dict[str, list[Prediction]] = defaultdict(list)
     for p in predictions:
         by_variant[p.variant].append(p)
-    for variant, preds in by_variant.items():
+    for variant, all_preds in by_variant.items():
+        # A failed LLM call says nothing about the image: leave it out, but report how many.
+        preds = [p for p in all_preds if not p.error]
         tp = sum(p.alarm and p.positive_truth for p in preds)
         fp = sum(p.alarm and not p.positive_truth for p in preds)
         fn = sum(not p.alarm and p.positive_truth for p in preds)
@@ -146,7 +163,7 @@ def metrics(predictions: list[Prediction]) -> list[dict[str, Any]]:
         # "Any alert" counts WASPADA too: what a person would be bothered with.
         alert_recall = _ratio(sum(p.level != "AMAN" and p.positive_truth for p in preds), sum(p.positive_truth for p in preds))
         row: dict[str, Any] = {
-            "variant": variant, "n": len(preds), "precision": precision, "recall": recall, "f1": f1,
+            "variant": variant, "n": len(preds), "errors": len(all_preds) - len(preds), "precision": precision, "recall": recall, "f1": f1,
             "recall_any_alert": alert_recall,
         }
         for cls in LOOKALIKE_CLASSES + ("normal",):
@@ -243,7 +260,7 @@ def failures_markdown(predictions: list[Prediction], rows: list[dict[str, Any]])
     }
     lines = ["# Analisis kegagalan", "", f"Dibuat {now_local():%d-%m-%Y %H:%M} WITA.", "", "## Ringkasan metrik", ""]
     if rows:
-        keys = ["variant", "n", "precision", "recall", "f1", "recall_any_alert", "false_alarm_fog", "false_alarm_sunset",
+        keys = ["variant", "n", "errors", "precision", "recall", "f1", "recall_any_alert", "false_alarm_fog", "false_alarm_sunset",
                 "false_alarm_lights", "false_alarm_normal", "consistency", "confidence_std_mean"]
         keys = [k for k in keys if any(k in r for r in rows)]
         lines += ["| " + " | ".join(keys) + " |", "|" + "---|" * len(keys)]

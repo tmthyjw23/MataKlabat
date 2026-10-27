@@ -85,3 +85,20 @@ def test_per_class_limit(test_set):
     settings = Settings(root=".", cameras=(), resources=Resources())
     preds = evaluate(test_set, settings, ["local"], None, per_class=1)
     assert len(preds) == 6 and {p.file.split("/")[1] for p in preds} == {"0.png"}
+
+
+def test_failed_llm_calls_are_excluded_and_stop_the_run(test_set):
+    from mataklabat.evaluation import LLMUnavailable
+
+    settings = Settings(root=".", cameras=(), resources=Resources())
+    calls = {"n": 0}
+
+    def flaky(image, ctx, version):
+        calls["n"] += 1
+        return LLMVerdict.failed("api_error: APIConnectionError", "v2") if calls["n"] == 2 else fake_verify(image, ctx, "v2")
+
+    preds = evaluate(test_set, settings, ["v2"], flaky)
+    row = metrics(preds)[0]
+    assert row["errors"] == 1 and row["n"] == 11
+    with pytest.raises(LLMUnavailable, match="9router"):
+        evaluate(test_set, settings, ["v2"], lambda *a: LLMVerdict.failed("api_error: APIConnectionError", "v2"))
