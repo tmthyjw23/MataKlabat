@@ -91,8 +91,12 @@ class OutboxSender:
         self._thread: threading.Thread | None = None
 
     def start(self) -> OutboxSender:
+        # Always overwrite the row, so a status left by an earlier run (e.g. before the
+        # token was filled in) never lingers until the first message is sent.
         if self.client is None:
             self.storage.set_health("telegram", None, "Telegram belum dikonfigurasi (pesan disimpan sebagai mode kering)")
+        else:
+            self.storage.set_health("telegram", True, "terkonfigurasi, belum ada pesan terkirim sejak sistem dinyalakan")
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="outbox", daemon=True)
         self._thread.start()

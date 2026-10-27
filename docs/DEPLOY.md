@@ -82,8 +82,11 @@ Kuota: setiap kamera **aktif** memanggil AI saat ada tanda, saat status naik, da
 
 ## 4. Service systemd
 
+Jalankan sebagai user biasa pemilik folder (di VPS tim: `timothy`), **bukan** setelah `sudo su`. Di sesi root, `~` berarti `/root` dan unit akan menunjuk `/home/root/...` lalu gagal dengan `status=226/NAMESPACE`. Nama user ditulis langsung:
+
 ```bash
-sed "s/USER/$USER/g" deploy/mataklabat.service | sudo tee /etc/systemd/system/mataklabat.service >/dev/null
+cd ~/mataklabat
+sed "s/USER/timothy/g" deploy/mataklabat.service | sudo tee /etc/systemd/system/mataklabat.service >/dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable --now mataklabat
 systemctl status mataklabat --no-pager

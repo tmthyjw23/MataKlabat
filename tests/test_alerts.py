@@ -331,6 +331,21 @@ def test_dry_run_items_are_never_sent(tmp_path):
     assert session.calls == []
 
 
+def test_start_overwrites_stale_telegram_health(tmp_path):
+    settings = Settings(root=tmp_path, cameras=(CAM,), resources=Resources())
+    storage = Storage(settings.db_path)
+    sender = OutboxSender(storage, None, poll_s=0.01)
+    sender.start()
+    sender.stop()
+    assert {h["component"]: h["ok"] for h in ReadStore(settings.db_path).health()}["telegram"] == -1
+    # Token filled in, system restarted: the old "not configured" row must not linger.
+    sender = OutboxSender(storage, TelegramClient("t", "c", session=FakeSession()), poll_s=0.01)
+    sender.start()
+    sender.stop()
+    row = {h["component"]: h for h in ReadStore(settings.db_path).health()}["telegram"]
+    assert row["ok"] == 1 and "terkonfigurasi" in row["detail"]
+
+
 def test_morning_summary_window_and_weather_wait(tmp_path):
     settings = Settings(root=tmp_path, cameras=(CAM,), resources=Resources())
     storage = Storage(settings.db_path)
